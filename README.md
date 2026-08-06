@@ -16,7 +16,7 @@ Toda capacidad incluida debe cumplir cinco condiciones:
 
 ## Aplicación web
 
-El primer canal implementado es el portal de acceso de `apps/web`, construido con Next.js y TypeScript. Es una interfaz de acceso en modo demostración: valida el formulario localmente, muestra estados de carga y error, y deja explícito que todavía no autentica ni conserva sesiones.
+El primer canal implementado es el portal de acceso de `apps/bos-web`, construido con Next.js y TypeScript. Corresponde al deployment unit **Web/admin/control tower** de la arquitectura técnica. Es una interfaz de acceso en modo demostración: valida el formulario localmente, muestra estados de carga y error, y deja explícito que todavía no autentica ni conserva sesiones.
 
 ```powershell
 npm.cmd install --cache .npm-cache

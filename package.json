@@ -6,9 +6,9 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=@fleeter/web",
-    "build": "npm run build --workspace=@fleeter/web",
-    "start": "npm run start --workspace=@fleeter/web",
-    "typecheck": "npm run typecheck --workspace=@fleeter/web"
+    "dev": "npm run dev --workspace=@fleeter/bos-web",
+    "build": "npm run build --workspace=@fleeter/bos-web",
+    "start": "npm run start --workspace=@fleeter/bos-web",
+    "typecheck": "npm run typecheck --workspace=@fleeter/bos-web"
   }
 }
