@@ -1,0 +1,14 @@
+{
+  "name": "fleeter-bos",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@fleeter/web",
+    "build": "npm run build --workspace=@fleeter/web",
+    "start": "npm run start --workspace=@fleeter/web",
+    "typecheck": "npm run typecheck --workspace=@fleeter/web"
+  }
+}

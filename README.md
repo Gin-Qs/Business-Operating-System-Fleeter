@@ -14,6 +14,15 @@ Toda capacidad incluida debe cumplir cinco condiciones:
 4. Emitir evidencia o eventos auditables.
 5. Producir una métrica o resultado que permita mejorar el proceso.
 
+## Aplicación web
+
+El primer canal implementado es el portal de acceso de `apps/web`, construido con Next.js y TypeScript. Es una interfaz de acceso en modo demostración: valida el formulario localmente, muestra estados de carga y error, y deja explícito que todavía no autentica ni conserva sesiones.
+
+```powershell
+npm.cmd install --cache .npm-cache
+npm.cmd run dev
+```
+
 ## Índice de la especificación
 
 | Documento | Propósito |
