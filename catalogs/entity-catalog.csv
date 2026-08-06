@@ -1,0 +1,73 @@
+entity_id,name,owner_context,grain,key_relationships,classification,source_of_truth
+ORG-001,Tenant,BC-01,Una organización SaaS,subscription;configuration,confidential,BOS organization
+ORG-002,LegalEntity,BC-01,Una razón social por tenant,tenant;bank_accounts;tax_profiles,confidential,BOS organization
+ORG-003,BusinessUnit,BC-01,Una unidad de negocio,legal_entity;cost_centers,internal,BOS organization
+ORG-004,Site,BC-01,Una ubicación operativa propia,legal_entity;location,internal,BOS organization
+ORG-005,User,BC-01,Una identidad de usuario,tenant;memberships;devices,restricted,Identity provider/BOS
+ORG-006,Role,BC-01,Un rol versionado,permissions;scope,internal,BOS authorization
+ORG-007,Policy,BC-01,Una política versionada,decision_level;rules,internal,BOS policy
+ORG-008,CorporateDecision,BC-01/06,Una decisión material,metrics;intervention;outcome,confidential,BOS decision register
+ORG-009,Objective,BC-01,Un objetivo por periodo,kpis;initiatives;budget,internal,BOS strategy
+COM-001,CommercialAccount,BC-02,Un prospecto/cliente comercial,contacts;customer_profile,confidential,BOS commercial
+COM-002,Contact,BC-02,Una persona de contacto,commercial_account;preferences,restricted,BOS commercial
+COM-003,Opportunity,BC-02,Una oportunidad comercial,account;service_profile;quotes,confidential,BOS commercial
+COM-004,CustomerProfile,BC-02,Un perfil operativo/fiscal por cliente,account;credit;contracts,confidential,BOS commercial
+COM-005,QuoteVersion,BC-02,Una versión inmutable de cotización,opportunity;cost_snapshot;rate,confidential,BOS pricing
+COM-006,RateCardVersion,BC-02,Un tarifario versionado,customer;lane;service;charges,confidential,BOS pricing
+COM-007,ContractVersion,BC-02,Una versión contractual,customer;service_profile;rates;SLA,restricted,BOS contract
+COM-008,CreditProfile,BC-02,Un perfil de crédito por cliente y empresa,limit;exposure;holds,restricted,BOS credit
+TRN-001,ServiceRequest,BC-03,Una solicitud del cliente,customer;contract;locations;cargo,confidential,BOS transport
+TRN-002,TransportOrder,BC-03,Un compromiso de transporte,request;shipments;trips,confidential,BOS transport
+TRN-003,Shipment,BC-03,Una carga/consignación,order;items;stops,confidential,BOS transport
+TRN-004,ShipmentItem,BC-03,Una línea de mercancía,shipment;delivery_quantities,confidential,BOS transport
+TRN-005,Stop,BC-03,Una parada planificada,order;location;time_window,confidential,BOS transport
+TRN-006,RoutePlan,BC-03,Una versión de ruta/itinerario,order;stops;restrictions,confidential,BOS planning
+TRN-007,Trip,BC-03,Una ejecución física,orders;assignment;stops,confidential,BOS transport
+TRN-008,Assignment,BC-03,Una versión de recursos asignados,trip;vehicle;driver;carrier,confidential,BOS transport
+TRN-009,StopExecution,BC-03,Una ejecución de parada,trip;stop;delivery;tracking,confidential,BOS transport
+TRN-010,DeliveryOutcome,BC-03,Un resultado de entrega,stop_execution;quantities;evidence,confidential,BOS transport
+TRN-011,TrackingEvent,BC-03,Un evento normalizado de posición,vehicle;trip;raw_event,restricted,BOS tracking normalized
+TRN-012,EvidenceRequirement,BC-03,Un requisito versionado de evidencia,contract;customer;stop,internal,BOS transport
+TRN-013,EvidenceSubmission,BC-03,Una presentación de evidencia,trip;stop;documents,restricted,BOS transport/content
+TRN-014,TripExpenseDeclaration,BC-03,Un gasto declarado,trip;employee;document,confidential,BOS transport
+CAP-001,Vehicle,BC-04,Un vehículo,owner;eligibility;work_orders,confidential,BOS capacity
+CAP-002,TrailerEquipment,BC-04,Un remolque/equipo,owner;eligibility;assignments,confidential,BOS capacity
+CAP-003,AssetUseAgreement,BC-04,Una relación de uso/arrendamiento,asset;parties;payments,restricted,BOS capacity
+CAP-004,Driver,BC-04,Una persona elegible para conducir,employee;credentials;shifts,restricted,BOS capacity
+CAP-005,DriverShift,BC-04,Un turno de operador,driver;assignments;rest,restricted,BOS capacity
+CAP-006,Credential,BC-04,Una licencia/permiso/certificación,subject;issuer;validity,restricted,BOS compliance
+CAP-007,Carrier,BC-04,Un transportista externo,contracts;authority;resources,confidential,BOS partner
+CAP-008,CarrierTender,BC-04,Una invitación/oferta de capacidad,order;carrier;rate,confidential,BOS capacity
+CAP-009,Inspection,BC-04,Una inspección de activo/persona,resource;findings,confidential,BOS maintenance
+CAP-010,Defect,BC-04,Un defecto reportado,asset;inspection;work_order,confidential,BOS maintenance
+CAP-011,MaintenancePlan,BC-04,Un plan versionado por activo/tipo,thresholds;tasks,internal,BOS maintenance
+CAP-012,WorkOrder,BC-04,Una orden de mantenimiento,asset;defects;parts;labor,confidential,BOS maintenance
+CAP-013,Tire,BC-04,Una llanta individual,asset;position;measurements,confidential,BOS fleet
+CAP-014,FuelTransaction,BC-04,Una transacción de combustible,vehicle;driver;provider;trip,confidential,BOS fuel normalized
+CAP-015,Employee,BC-04,Una relación laboral,person;position;compensation,restricted,HR/BOS
+FIN-001,BillableCharge,BC-05,Un cargo facturable,service;contract;rate;approval,confidential,BOS finance
+FIN-002,Invoice,BC-05,Un documento de ingreso,customer;charges;fiscal_document,restricted,BOS finance/fiscal adapter
+FIN-003,Receivable,BC-05,Un saldo por documento,invoice;applications;disputes,restricted,BOS finance
+FIN-004,Payment,BC-05,Un pago recibido/enviado,bank_transaction;counterparty,restricted,BOS treasury
+FIN-005,PaymentApplication,BC-05,Una aplicación de pago,payment;receivable,restricted,BOS treasury
+FIN-006,CostRecord,BC-05,Un costo en una etapa,source;trip;asset;allocation,confidential,BOS subledger
+FIN-007,ProfitabilitySnapshot,BC-05,Una versión de rentabilidad,object;revenue;costs;policy,confidential,BOS profitability
+FIN-008,PurchaseRequisition,BC-05,Una necesidad de compra,requester;budget;items,confidential,BOS procurement
+FIN-009,PurchaseOrder,BC-05,Una orden a proveedor,vendor;items;receipts,confidential,BOS procurement
+FIN-010,GoodsReceipt,BC-05,Una recepción de compra,PO;items;warehouse,confidential,BOS procurement
+FIN-011,SupplierInvoice,BC-05,Una factura de proveedor,vendor;PO;receipt;payment,restricted,BOS payables
+FIN-012,BankTransaction,BC-05,Un movimiento bancario,account;payment;reconciliation,restricted,Bank normalized
+FIN-013,InventoryItem,BC-04/05,Un artículo inventariable,stock;lots;movements,confidential,BOS inventory
+FIN-014,InventoryMovement,BC-04/05,Un movimiento de inventario,item;warehouse;source,confidential,BOS inventory
+RSK-001,Case,BC-06,Un caso/incidencia/reclamo,affected_entities;actions;SLA,confidential,BOS case management
+RSK-002,Claim,BC-06,Una reclamación económica/seguro,case;shipment;recovery,restricted,BOS claims
+RSK-003,RootCause,BC-06,Una causa validada,case;evidence;method,confidential,BOS quality
+RSK-004,CorrectiveAction,BC-06,Una acción CAPA,root_cause;owner;effectiveness,confidential,BOS quality
+RSK-005,Obligation,BC-06,Una obligación normativa/contractual,jurisdiction;control;evidence,confidential,BOS compliance
+RSK-006,Control,BC-06,Un control versionado,obligation;owner;test,confidential,BOS compliance
+RSK-007,MetricDefinition,BC-06,Una versión de métrica,formula;owner;sources,internal,Semantic catalog
+RSK-008,Intervention,BC-06,Una acción para cambiar un resultado,decision;population;outcome,confidential,BOS decision register
+AI-001,AIUseCase,BC-06,Un caso de uso gobernado,owner;model;evaluation,confidential,AI registry
+AI-002,ModelVersion,BC-06,Una versión de modelo,pipeline;dataset;metrics,restricted,Model registry
+AI-003,Recommendation,BC-06,Una recomendación emitida,use_case;sources;approval;outcome,confidential,BOS AI gateway
+
