@@ -18,11 +18,26 @@ import { NextResponse, type NextRequest } from "next/server";
 const PROTECTED_PREFIXES = ["/workspace"];
 
 export async function proxy(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  // Un despliegue sin configurar no debe dejar pasar peticiones con un error
+  // confuso: falla cerrado y dice exactamente qué falta. Si esto se resolviera
+  // dejando pasar, un entorno mal configurado quedaría abierto.
+  if (!supabaseUrl || !supabaseKey) {
+    return new NextResponse(
+      "Configuración incompleta: faltan NEXT_PUBLIC_SUPABASE_URL o " +
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY en el entorno del despliegue. " +
+        "Ver docs/runbooks/01-despliegue-vercel.md",
+      { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } },
+    );
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
