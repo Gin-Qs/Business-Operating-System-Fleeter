@@ -69,6 +69,12 @@ export default async function WorkspacePage() {
           <div className="flex items-center gap-2">
             <Link
               className="rounded-xl border border-[#cbd8d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#17332d] transition hover:border-[#267768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768]"
+              href="/workspace/solicitudes"
+            >
+              Solicitudes
+            </Link>
+            <Link
+              className="rounded-xl border border-[#cbd8d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#17332d] transition hover:border-[#267768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768]"
               href="/workspace/configuracion"
             >
               Configuración

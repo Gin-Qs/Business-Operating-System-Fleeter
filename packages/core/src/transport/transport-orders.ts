@@ -17,6 +17,7 @@ import {
   addCommittedExposure,
   assessCredit,
   listQuoteCharges,
+  listQuotesForRequest,
   requireAcceptedQuote,
   requireContractableCustomer,
   type QuoteChargeRecord,
@@ -366,60 +367,58 @@ export interface EmittedEventView {
   correlationId: string;
 }
 
-export interface OrderTrace {
-  order: TransportOrderRecord;
-  request: ServiceRequestRecord;
+export interface QuoteVersionView {
   quote: QuoteRecord;
   charges: QuoteChargeRecord[];
-  /** Todas las versiones de la solicitud, no solo la que originó la orden. */
-  quoteVersions: { id: string; version: number; status: string; revision: number }[];
+}
+
+export interface RequestTrace {
+  request: ServiceRequestRecord;
+  /** Todas las versiones, de la más reciente a la primera. */
+  quotes: QuoteVersionView[];
+  orders: TransportOrderRecord[];
   exceptions: (ExceptionDecision & { policyCode: string })[];
   audit: AuditEntryView[];
   events: EmittedEventView[];
 }
 
 /**
- * Historia completa de una orden — docs/12 §9.7.
+ * Historia completa de una solicitud y todo lo que colgó de ella.
  *
- * "Dada una orden comprometida, cuando se consulta su historia, entonces se
- * puede reconstruir solicitud, versión de cotización, política, actor, motivo,
- * timestamps y correlación."
- *
- * Se arma en una consulta por pieza y no en una vista SQL gigante a propósito:
- * cada pieza es la misma que devuelve su propio módulo, así que lo que se ve
- * aquí es exactamente lo que el sistema tiene, sin una proyección paralela que
- * pueda desviarse (docs/02 §4, "una vista agregada no se convierte en nueva
- * fuente de verdad").
+ * Se arma con una consulta por pieza y no con una vista SQL gigante a
+ * propósito: cada pieza es la misma que devuelve su propio módulo, así que lo
+ * que se lee aquí es exactamente lo que el sistema tiene, sin una proyección
+ * paralela que pueda desviarse (docs/02 §4, "una vista agregada no se convierte
+ * en nueva fuente de verdad").
  */
-export async function getOrderTrace(
+export async function getRequestTrace(
   tx: Tx,
   actor: Actor,
-  orderId: string,
-): Promise<OrderTrace> {
-  requirePermission(actor, "transport_order:read");
+  requestId: string,
+): Promise<RequestTrace> {
   requirePermission(actor, "service_request:read");
   requirePermission(actor, "quote:read");
 
-  const order = await getTransportOrder(tx, actor, orderId);
-  const request = await getServiceRequest(tx, actor, order.serviceRequestId);
+  const request = await getServiceRequest(tx, actor, requestId);
+  const quoteRecords = await listQuotesForRequest(tx, actor, requestId);
+  const orders = await listTransportOrders(tx, actor, { serviceRequestId: requestId });
 
-  const { rows: quoteRows } = await tx.query<{
-    id: string;
-    version: number;
-    status: string;
-    revision: number;
-  }>(
-    `select id, version, status::text as status, revision
-     from com.quote where service_request_id = $1 order by version`,
-    [order.serviceRequestId],
+  const quotes = await Promise.all(
+    quoteRecords.map(async (quote) => ({
+      quote,
+      charges: await listQuoteCharges(tx, quote.id),
+    })),
   );
 
-  const quote = await requireAcceptedQuote(tx, order.serviceRequestId);
-  const charges = await listQuoteCharges(tx, order.quoteId);
+  const subjects = [
+    requestId,
+    ...quoteRecords.map((quote) => quote.id),
+    ...orders.map((order) => order.id),
+  ];
 
-  const [quoteExceptions, requestExceptions] = await Promise.all([
-    listExceptions(tx, "Quote", order.quoteId),
-    listExceptions(tx, "ServiceRequest", order.serviceRequestId),
+  const exceptionLists = await Promise.all([
+    listExceptions(tx, "ServiceRequest", requestId),
+    ...quoteRecords.map((quote) => listExceptions(tx, "Quote", quote.id)),
   ]);
 
   const { rows: audit } = await tx.query<{
@@ -437,7 +436,7 @@ export async function getOrderTrace(
      from plt.audit_log
      where entity_id = any($1::uuid[])
      order by occurred_at, id`,
-    [[order.id, order.serviceRequestId, ...quoteRows.map((row) => row.id)]],
+    [subjects],
   );
 
   const { rows: events } = await tx.query<{
@@ -454,16 +453,14 @@ export async function getOrderTrace(
      from plt.outbox
      where aggregate_id = any($1::uuid[])
      order by occurred_at, aggregate_version`,
-    [[order.id, order.serviceRequestId, ...quoteRows.map((row) => row.id)]],
+    [subjects],
   );
 
   return {
-    order,
     request,
-    quote,
-    charges,
-    quoteVersions: quoteRows,
-    exceptions: [...quoteExceptions, ...requestExceptions],
+    quotes,
+    orders,
+    exceptions: exceptionLists.flat(),
     audit: audit.map((row) => ({
       occurredAt: row.occurred_at,
       action: row.action,
@@ -482,6 +479,51 @@ export async function getOrderTrace(
       occurredAt: row.occurred_at,
       status: row.status,
       correlationId: row.correlation_id,
+    })),
+  };
+}
+
+export interface OrderTrace extends RequestTrace {
+  order: TransportOrderRecord;
+  /** La versión comercial exacta que originó el compromiso. */
+  quote: QuoteRecord;
+  charges: QuoteChargeRecord[];
+  quoteVersions: { id: string; version: number; status: string; revision: number }[];
+}
+
+/**
+ * Historia completa de una orden — docs/12 §9.7.
+ *
+ * "Dada una orden comprometida, cuando se consulta su historia, entonces se
+ * puede reconstruir solicitud, versión de cotización, política, actor, motivo,
+ * timestamps y correlación."
+ */
+export async function getOrderTrace(
+  tx: Tx,
+  actor: Actor,
+  orderId: string,
+): Promise<OrderTrace> {
+  requirePermission(actor, "transport_order:read");
+
+  const order = await getTransportOrder(tx, actor, orderId);
+  const trace = await getRequestTrace(tx, actor, order.serviceRequestId);
+
+  // La versión que originó la orden, no "la última": una solicitud puede tener
+  // versiones posteriores y la orden conserva la suya (docs/12 §4).
+  const quote =
+    trace.quotes.find((version) => version.quote.id === order.quoteId) ??
+    ({ quote: await requireAcceptedQuote(tx, order.serviceRequestId), charges: [] } as QuoteVersionView);
+
+  return {
+    ...trace,
+    order,
+    quote: quote.quote,
+    charges: quote.charges,
+    quoteVersions: trace.quotes.map(({ quote: version }) => ({
+      id: version.id,
+      version: version.version,
+      status: version.status,
+      revision: version.revision,
     })),
   };
 }

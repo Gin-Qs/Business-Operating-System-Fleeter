@@ -16,33 +16,48 @@ Toda capacidad incluida debe cumplir cinco condiciones:
 
 ## Estado de construcción
 
-**Fase 0 — Fundación ejecutable: completa.** Tenant, identidad, autorización,
-auditoría, outbox transaccional e idempotencia funcionan de punta a punta y
-están cubiertos por pruebas contra una base real. La Fase 1
-([docs/12](docs/12-phase-1-request-to-order.md)) construye sobre esto.
+**Fase 0 — Fundación ejecutable: completa.** **Fase 1 — Solicitud a Orden:
+completa.** Una necesidad de transporte se captura, se cotiza por versiones
+inmutables, se aprueba contra una política configurable y se convierte en una
+orden comprometida, con auditoría, eventos e idempotencia en cada transición.
+Los siete criterios de aceptación de
+[docs/12 §9](docs/12-phase-1-request-to-order.md) tienen una prueba cada uno
+contra una base real con row level security activo.
 
 | Componente | Estado |
 |---|---|
 | Esquema por contexto, RLS y roles sin `BYPASSRLS` | Operativo |
-| Provisionamiento de tenant, membresías, roles y permisos | Operativo |
+| Provisionamiento de tenant, alta y revocación de membresías | Operativo |
 | Auditoría inmutable y outbox con envelope canónico | Operativo |
-| Idempotencia de comandos | Operativo |
+| Idempotencia de comandos y auditoría de rechazos | Operativo |
 | Worker de publicación con backoff y cola de errores | Operativo |
 | Autenticación real y espacio de trabajo por tenant | Operativo |
-| Capacidades de negocio (solicitud, cotización, orden) | Fase 1 |
+| Políticas versionadas con alcance (tenant, entidad legal, cliente) | Operativo |
+| Cliente, contacto, ubicación, perfil de servicio y crédito | Operativo |
+| Solicitud, cotización versionada, excepciones y orden comprometida | Operativo |
+| API `/v1` con `Idempotency-Key`, `If-Match` y correlación | Operativo |
+| Planeación, viaje, entrega, evidencia y facturación | Fase 2 |
 
 ## Estructura
 
 ```text
-apps/bos-web/          Canal web. Next.js: hospeda el dominio, no lo contiene
-packages/contracts/    Envelope de eventos, errores y catálogo de permisos
-packages/domain/       Dominio puro: Money, máquinas de estado, autorización
+apps/bos-web/          Canal web y API /v1. Next.js hospeda el dominio, no lo contiene
+packages/contracts/    Envelope de eventos, errores, permisos y esquemas de política
+packages/domain/       Dominio puro: Money, máquinas de estado, autorización, reglas
+packages/core/         Núcleo transaccional: BC-02 comercial y BC-03 transporte
 packages/platform/     Infraestructura transversal: unidad de trabajo, auditoría,
-                       outbox, idempotencia, sesión
+                       outbox, idempotencia, políticas, excepciones, sesión
 supabase/migrations/   Esquema versionado
 scripts/               Verificación de entorno y provisionamiento
-tests/                 Dominio (puro) e integración (base real)
+tests/                 Dominio (puro), integración (base real), API y arquitectura
 ```
+
+`packages/core` separa los contextos de negocio en módulos con contrato propio.
+BC-03 depende de BC-02 y nunca al revés: la cotización recibe la solicitud como
+valor y jamás consulta su esquema. Esa dirección única —verificada por
+[una prueba](tests/architecture/module-boundaries.test.ts), no solo documentada—
+es lo que permitiría extraer uno de los dos del monolito sin reescribir el otro
+([ADR-001](docs/adr/ADR-001-modular-monolith.md)).
 
 `packages/domain` no depende de ningún framework. Next.js es solo el anfitrión
 actual: extraer una API propia cuando haga falta ([docs/02 §6](docs/02-domain-architecture.md))
@@ -58,13 +73,50 @@ npm.cmd run dev
 ```
 
 El alta del primer tenant y la gestión de credenciales están en
-[runbook 00](docs/runbooks/00-entornos-y-credenciales.md).
+[runbook 00](docs/runbooks/00-entornos-y-credenciales.md). Para recorrer el ciclo
+de negocio completo, [runbook 02](docs/runbooks/02-fase-1-solicitud-a-orden.md).
 
 ```powershell
-npm.cmd run typecheck    # los cuatro paquetes
-npm.cmd test             # dominio + integración
+npm.cmd run typecheck    # los cinco paquetes
+npm.cmd test             # dominio, integración, API y arquitectura
 npm.cmd run outbox:publish -- --loop
 ```
+
+## API
+
+El ciclo de negocio se opera por HTTP ([docs/12 §7](docs/12-phase-1-request-to-order.md)).
+La interfaz web usa exactamente los mismos comandos, así que una integración no
+recibe un sistema distinto del que ve un usuario.
+
+```text
+POST   /v1/customers                                  GET /v1/customers
+POST   /v1/contacts                                   GET /v1/contacts?customer_id=
+POST   /v1/locations                                  GET /v1/locations
+POST   /v1/service-profiles                           GET /v1/service-profiles
+PUT    /v1/customers/{id}/credit                      POST /v1/customers/{id}/credit
+
+POST   /v1/service-requests                           GET /v1/service-requests
+GET    /v1/service-requests/{id}                      PATCH /v1/service-requests/{id}
+POST   /v1/service-requests/{id}/submit
+POST   /v1/service-requests/{id}/request-information
+POST   /v1/service-requests/{id}/accept
+POST   /v1/service-requests/{id}/cancel
+
+POST   /v1/quotes                                     GET /v1/quotes/{id}
+POST   /v1/quotes/{id}/cost
+POST   /v1/quotes/{id}/request-approval
+POST   /v1/quotes/{id}/approve
+POST   /v1/quotes/{id}/reject-approval
+POST   /v1/quotes/{id}/send
+POST   /v1/quotes/{id}/decision
+
+POST   /v1/transport-orders                           GET /v1/transport-orders/{id}
+```
+
+Toda escritura exige `Idempotency-Key`; un reintento devuelve la respuesta
+original y responde `Idempotent-Replay: true`. `If-Match` lleva la revisión que
+el `GET` devolvió como `ETag`. `X-Correlation-Id` se propaga o se genera, y
+aparece en la respuesta, en la auditoría y en cada evento emitido.
 
 ## Índice de la especificación
 
