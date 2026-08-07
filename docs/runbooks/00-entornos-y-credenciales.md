@@ -78,6 +78,25 @@ supabase db push
 ```
 
 Se aplican **antes** que el código que las necesita ([docs/11 §10](../11-technical-reference-architecture.md)).
+Nada automatiza este paso contra un proyecto real: desplegar código que espera
+una tabla que todavía no existe produce exactamente el error que se ve cuando se
+olvida (`relation "..." does not exist`).
+
+### Correr las pruebas sin Supabase
+
+Las pruebas de integración no necesitan el proyecto real. Contra cualquier
+PostgreSQL con TLS:
+
+```bash
+bash scripts/setup-local-db.sh "postgresql://postgres@127.0.0.1:5433/bos_test?sslmode=require"
+```
+
+Aplica el sustituto de `auth`, todas las migraciones y las identidades de
+prueba. Es lo mismo que hace CI, que levanta un PostgreSQL efímero por
+ejecución: así una rama que añade una migración se valida sola, sin que nadie
+tenga que aplicarla antes en una base compartida.
+
+El script se niega a correr contra un host de Supabase.
 
 ## 6. Alta del primer tenant
 
