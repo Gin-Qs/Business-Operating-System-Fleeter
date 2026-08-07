@@ -43,6 +43,35 @@ cabeceras de seguridad.
 > Repository → `Gin-Qs/Business-Operating-System-Fleeter`**, y fijar el Root
 > Directory en la misma pantalla de importación.
 
+### El segundo error, que aparece justo después
+
+Con la raíz ya corregida, redesplegar producción falla con:
+
+```text
+The specified Root Directory "apps/bos-web/" does not exist.
+```
+
+Parece que el ajuste no se guardó. No es eso. **Producción sigue a `main`**, y
+mientras la Fase 0 viva en una rama sin fusionar, `main` contiene únicamente el
+`README.md`: `apps/bos-web` no existe ahí, y Vercel tiene razón al decirlo.
+
+Los dos errores se distinguen por la primera línea del log:
+
+| Log dice | Significa |
+|---|---|
+| `Cloning ... (Branch: main, Commit: 547943c)` | Estás desplegando la rama vacía |
+| `Cloning ... (Branch: feat/...)` y falla | Ahí sí hay un problema de build real |
+
+Mientras el PR no se fusione:
+
+- **Producción no puede funcionar.** No hay nada que construir en `main`.
+- **Los previews sí.** Cada push a la rama genera su URL, y esa es la que sirve
+  para ir viendo avances.
+
+Fusionar el PR a `main` resuelve producción de forma definitiva. Cambiar la
+rama de producción a la de trabajo también funcionaría, pero deja el proyecto
+apuntando a una rama efímera y hay que acordarse de revertirlo.
+
 `apps/bos-web/vercel.json` ya lleva las cabeceras de seguridad (HSTS, nosniff,
 `frame-ancestors 'none'`, Referrer-Policy) y desactiva el cache de `/api/*`.
 
