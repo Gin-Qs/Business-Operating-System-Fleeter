@@ -13,13 +13,13 @@ export function SignInForm() {
   return (
     <form action={formAction} className="mt-9 space-y-5">
       <div className="space-y-2">
-        <label className="block text-sm font-semibold text-[#17332d]" htmlFor="email">
+        <label className="block text-sm font-semibold text-[var(--fleeter-ink)]" htmlFor="email">
           Correo corporativo
         </label>
         <div className="relative">
           <input
             autoComplete="email"
-            className="w-full rounded-xl border border-[#cbd8d4] bg-white px-4 py-3.5 pr-12 text-[15px] text-[#102521] outline-none transition placeholder:text-[#748780] focus:border-[#267768] focus:ring-4 focus:ring-[#267768]/10 disabled:cursor-not-allowed disabled:bg-[#f1f5f3]"
+            className="bos-input px-4 py-3.5 pr-12 text-[15px] disabled:cursor-not-allowed"
             disabled={isPending}
             id="email"
             name="email"
@@ -27,23 +27,21 @@ export function SignInForm() {
             required
             type="email"
           />
-          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[#5d746c]">
+          <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[var(--fleeter-steel)]">
             <LockKey aria-hidden="true" size={19} weight="regular" />
           </span>
         </div>
-        <p className="text-xs leading-5 text-[#668078]">
-          Usa la cuenta asignada por el administrador de tu empresa.
-        </p>
+        <p className="text-xs leading-5 text-[var(--fleeter-steel)]">Usa la cuenta asignada por el administrador de tu empresa.</p>
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-semibold text-[#17332d]" htmlFor="password">
+        <label className="block text-sm font-semibold text-[var(--fleeter-ink)]" htmlFor="password">
           Contraseña
         </label>
         <div className="relative">
           <input
             autoComplete="current-password"
-            className="w-full rounded-xl border border-[#cbd8d4] bg-white px-4 py-3.5 pr-12 text-[15px] text-[#102521] outline-none transition placeholder:text-[#748780] focus:border-[#267768] focus:ring-4 focus:ring-[#267768]/10 disabled:cursor-not-allowed disabled:bg-[#f1f5f3]"
+            className="bos-input px-4 py-3.5 pr-12 text-[15px] disabled:cursor-not-allowed"
             disabled={isPending}
             id="password"
             name="password"
@@ -53,49 +51,31 @@ export function SignInForm() {
           />
           <button
             aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[#5d746c] transition hover:text-[#17332d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768]"
+            className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-[var(--fleeter-steel)] transition hover:text-[var(--fleeter-ink)]"
             disabled={isPending}
             onClick={() => setShowPassword((visible) => !visible)}
             type="button"
           >
-            {showPassword ? (
-              <EyeSlash aria-hidden="true" size={20} weight="regular" />
-            ) : (
-              <Eye aria-hidden="true" size={20} weight="regular" />
-            )}
+            {showPassword ? <EyeSlash aria-hidden="true" size={20} weight="regular" /> : <Eye aria-hidden="true" size={20} weight="regular" />}
           </button>
         </div>
       </div>
 
       {state.error && (
-        <div
-          aria-live="polite"
-          className="flex gap-3 rounded-xl border border-[#e7c8bf] bg-[#fff7f4] px-4 py-3 text-sm leading-5 text-[#8b3527]"
-        >
+        <div aria-live="polite" className="flex gap-3 border border-[rgba(192,57,43,0.35)] bg-[rgba(192,57,43,0.07)] px-4 py-3 text-sm leading-5 text-[var(--fleeter-incident)]">
           <WarningCircle aria-hidden="true" className="mt-0.5 shrink-0" size={19} weight="fill" />
           <p>{state.error}</p>
         </div>
       )}
 
       <div className="space-y-3 pt-1">
-        <button
-          className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#1e6f60] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(15,67,57,0.65)] transition duration-300 hover:bg-[#155a4e] active:translate-y-px active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-[#8da8a0]"
-          disabled={isPending}
-          type="submit"
-        >
+        <button className="bos-button group flex w-full items-center justify-center gap-2 px-5 py-3.5 text-sm font-semibold" disabled={isPending} type="submit">
           {isPending ? "Validando acceso" : "Ingresar al portal"}
-          <ArrowRight
-            aria-hidden="true"
-            className={
-              isPending ? "hidden" : "transition-transform duration-300 group-hover:translate-x-0.5"
-            }
-            size={19}
-            weight="bold"
-          />
+          <ArrowRight aria-hidden="true" className={isPending ? "hidden" : "transition-transform duration-200 group-hover:translate-x-0.5"} size={19} weight="bold" />
         </button>
         {isPending && (
-          <div aria-label="Validando acceso" className="h-1.5 overflow-hidden rounded-full bg-[#d9e6e1]">
-            <div className="h-full w-2/3 rounded-full bg-[#2b806e] portal-loading-bar" />
+          <div aria-label="Validando acceso" className="h-1 overflow-hidden bg-[var(--fleeter-mist)]">
+            <div className="portal-loading-bar h-full w-2/3 bg-[var(--fleeter-signal)]" />
           </div>
         )}
       </div>
