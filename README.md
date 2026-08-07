@@ -91,6 +91,16 @@ npm.cmd test             # dominio, integración, API y arquitectura
 npm.cmd run outbox:publish -- --loop
 ```
 
+Las pruebas de integración no necesitan Supabase: `scripts/setup-local-db.sh`
+deja el esquema completo en cualquier PostgreSQL local, y es lo mismo que hace
+CI, que levanta uno efímero por ejecución.
+
+Para revisar el sistema con datos dentro,
+`npm.cmd run seed:demo` deja un tenant con cinco solicitudes —una por cada
+estado que vale la pena mirar, incluido un margen bajo umbral y un crédito
+bloqueado— y una invitación por rol
+([runbook 00 §7](docs/runbooks/00-entornos-y-credenciales.md)).
+
 ## API
 
 El ciclo de negocio se opera por HTTP ([docs/12 §7](docs/12-phase-1-request-to-order.md)).

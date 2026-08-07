@@ -17,6 +17,7 @@
     "check:connection": "tsx --env-file-if-exists=.env.local scripts/check-connection.ts",
     "provision:tenant": "tsx --env-file-if-exists=.env.local scripts/provision-tenant.ts",
     "grant:role": "tsx --env-file-if-exists=.env.local scripts/grant-role.ts",
+    "seed:demo": "tsx --env-file-if-exists=.env.local scripts/seed-demo.ts",
     "outbox:publish": "tsx --env-file-if-exists=.env.local packages/platform/src/outbox/publisher-cli.ts"
   },
   "devDependencies": {

@@ -149,9 +149,64 @@ para automatizar, no para el uso diario.
 
 ## 7. Datos de prueba
 
-`supabase/seed/test-fixtures.sql` crea tres identidades para las pruebas de
+`supabase/seed/test-fixtures.sql` crea cuatro identidades para las pruebas de
 integración. **Solo dev y test** — no es una migración a propósito. No pueden
 iniciar sesión: su `encrypted_password` está vacío.
+
+### Tenant de demostración
+
+Para revisar el avance sin capturar nada a mano:
+
+```bash
+npm run seed:demo -- \
+  --tenant-slug demo-fleeter \
+  --owner-id <uuid de auth.users> \
+  --owner-email correo@empresa.com \
+  --domain empresa-de-pruebas.mx
+```
+
+Deja un tenant con clientes, ubicaciones, perfiles, límites de crédito y cinco
+solicitudes, una por cada estado que vale la pena mirar:
+
+| Referencia | En qué estado queda | Qué enseña |
+|---|---|---|
+| `DEMO-REQ-001` | Orden comprometida | El ciclo completo y su historia reconstruible |
+| `DEMO-REQ-002` | Cotización en aprobación | Un margen del 3.8% contra un umbral del 15%: exige excepción |
+| `DEMO-REQ-003` | `NeedsInformation` | Enviar sin origen no falla, se detiene y dice por qué |
+| `DEMO-REQ-004` | Cotización enviada | A la espera de la decisión del cliente |
+| `DEMO-REQ-005` | Aceptación bloqueada | Crédito en hold, con el rechazo auditado |
+
+Todo se crea con los mismos comandos que usa la aplicación, no con `insert`: las
+políticas se evaluaron de verdad, la auditoría existe y los eventos están en el
+outbox. Es idempotente.
+
+### Las cuentas
+
+El script **no crea identidades**: las contraseñas pertenecen al proveedor de
+identidad. Lo que crea son invitaciones, que es el camino real de alta. Una por
+rol del corte:
+
+```text
+comercial@<dominio>      commercial_executive
+pricing@<dominio>        pricing
+aprobador@<dominio>      commercial_approver
+credito@<dominio>        credit_officer
+operaciones@<dominio>    operations
+auditor@<dominio>        auditor
+```
+
+Cada persona entra al portal, pulsa **«Me invitaron y aún no tengo contraseña»**,
+pone ese correo y una contraseña nueva, y queda operativa con su rol.
+
+Dos cosas que conviene saber antes:
+
+- Con `--domain` inventado los correos de confirmación no llegan a ningún lado.
+  Si el proyecto de Supabase exige confirmar, usa un dominio cuyos buzones
+  puedas leer, o desactiva la confirmación en **Authentication → Providers →
+  Email** mientras dure la revisión.
+- Aprobar por debajo del umbral necesita **dos personas**: quien pide la
+  excepción no puede concederla. Activa al menos `pricing@` y `aprobador@` para
+  poder recorrer `DEMO-REQ-002` entero.
 
 ## 8. Worker de outbox
 
