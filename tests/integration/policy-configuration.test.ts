@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { MinMarginPolicy } from "@fleeter/contracts";
+import { minMarginPolicySchema, type MinMarginPolicy } from "@fleeter/contracts";
 import {
   closePools,
   listPolicies,
@@ -45,22 +45,33 @@ describe.skipIf(!hasDatabase)("políticas configurables", () => {
     await closePools();
   });
 
-  it("el provisionamiento deja las políticas con valores de arranque editables", async () => {
+  it("el provisionamiento deja una política de tenant válida y editable", async () => {
     const policy = await asAlpha((tx) => resolvePolicy<MinMarginPolicy>(tx, "MIN_MARGIN"));
 
     expect(policy).not.toBeNull();
     expect(policy!.scopeType).toBe("tenant");
-    expect(policy!.definition.threshold_pct).toBe("0.15");
+
+    // Se afirma que la definición cumple su esquema, no que valga una cifra
+    // concreta: el valor de arranque es editable por diseño, y una prueba que
+    // lo fije se rompería en cuanto alguien lo cambiara desde configuración.
+    expect(minMarginPolicySchema.safeParse(policy!.definition).success).toBe(true);
   });
 
   it("lo configurado para un cliente gana sobre lo general del sistema", async () => {
+    const general = await asAlpha((tx) => resolvePolicy<MinMarginPolicy>(tx, "MIN_MARGIN"));
+    expect(general!.scopeType).toBe("tenant");
+
+    // Umbral distinto del general en cada ejecución: la prueba no depende de
+    // qué versión dejó publicada la corrida anterior.
+    const negotiated = general!.definition.threshold_pct === "0.07" ? "0.03" : "0.07";
+
     await asAlpha((tx) =>
       publishPolicy(tx, {
         code: "MIN_MARGIN",
         scopeType: "customer",
         scopeId: customerId,
         definition: {
-          threshold_pct: "0.05",
+          threshold_pct: negotiated,
           min_absolute_margin: null,
           currency: "MXN",
           approver_permissions: ["quote:approve"],
@@ -71,16 +82,17 @@ describe.skipIf(!hasDatabase)("políticas configurables", () => {
       }),
     );
 
-    const general = await asAlpha((tx) => resolvePolicy<MinMarginPolicy>(tx, "MIN_MARGIN"));
     const forCustomer = await asAlpha((tx) =>
       resolvePolicy<MinMarginPolicy>(tx, "MIN_MARGIN", { customerId }),
     );
+    const generalAfter = await asAlpha((tx) => resolvePolicy<MinMarginPolicy>(tx, "MIN_MARGIN"));
 
-    expect(general!.definition.threshold_pct).toBe("0.15");
-    expect(general!.scopeType).toBe("tenant");
-
-    expect(forCustomer!.definition.threshold_pct).toBe("0.05");
     expect(forCustomer!.scopeType).toBe("customer");
+    expect(forCustomer!.definition.threshold_pct).toBe(negotiated);
+
+    // El alcance específico no altera el general: conviven.
+    expect(generalAfter!.scopeType).toBe("tenant");
+    expect(generalAfter!.definition.threshold_pct).toBe(general!.definition.threshold_pct);
   });
 
   it("publicar cierra la versión anterior en lugar de sobrescribirla", async () => {
