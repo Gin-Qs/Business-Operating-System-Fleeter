@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { PERMISSIONS, type Permission } from "@fleeter/contracts";
+import type { Actor } from "@fleeter/domain";
 import { provisionTenant, type TenantContext } from "@fleeter/platform";
 
 /**
@@ -73,3 +75,30 @@ export function contextFor(
     ...overrides,
   };
 }
+
+/**
+ * Actor con un conjunto explícito de permisos.
+ *
+ * En producción los permisos salen de la membresía; aquí se declaran para poder
+ * probar cada frontera por separado. Un actor con todo comprobaría el camino
+ * feliz y nada más: lo que interesa es que quien tiene `quote:cost` no pueda
+ * aprobar su propia cotización.
+ */
+export function actorFor(
+  tenant: TestTenant,
+  permissions: readonly Permission[] = PERMISSIONS,
+  overrides: Partial<Actor> = {},
+): Actor {
+  return {
+    type: "user",
+    userId: tenant.ownerUserId,
+    tenantId: tenant.tenantId,
+    legalEntityIds: null,
+    permissions: new Set(permissions),
+    ...overrides,
+  };
+}
+
+/** Sufijo corto y único: los códigos de maestro son únicos por tenant. */
+export const uniqueCode = (prefix: string): string =>
+  `${prefix}-${randomUUID().slice(0, 8).toUpperCase()}`;

@@ -151,6 +151,28 @@ export class Money {
     return Number(this.minor) / Number(denominator.minor);
   }
 
+  /**
+   * La misma razón, como cadena decimal exacta truncada hacia cero.
+   *
+   * `ratioTo` sirve para mostrar y para redactar un mensaje; esta es la que se
+   * persiste. Un margen del 33.333333% guardado como double y releído no vuelve
+   * a ser el mismo número, y el porcentaje contratado es un dato que después se
+   * compara contra el margen real para explicar una variación.
+   */
+  ratioDecimalTo(denominator: Money, scale = 8): string | null {
+    this.assertSameCurrency(denominator);
+    if (denominator.minor === 0n) return null;
+
+    const factor = 10n ** BigInt(scale);
+    const scaled = (this.minor * factor) / denominator.minor;
+    const negative = scaled < 0n;
+    const magnitude = negative ? -scaled : scaled;
+    const whole = magnitude / factor;
+    const fraction = (magnitude % factor).toString().padStart(scale, "0");
+
+    return `${negative ? "-" : ""}${whole}.${fraction}`;
+  }
+
   /** Cadena decimal exacta a escala interna, apta para `numeric(20,6)`. */
   toNumericString(): string {
     const negative = this.minor < 0n;

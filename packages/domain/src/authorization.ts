@@ -70,8 +70,15 @@ export function requireLegalEntityScope(actor: Actor, legalEntityId: string): vo
 /**
  * docs/03 §14.3: sin aprobación propia cuando la política exige maker-checker.
  * Quien creó o solicitó algo no puede ser quien lo aprueba.
+ *
+ * Recibe solo la identidad y no el Actor completo porque también lo llama la
+ * plataforma desde el contexto de una transacción, donde lo único disponible es
+ * el actor de la sesión. Un chequeo de identidad no necesita permisos.
  */
-export function requireDifferentApprover(actor: Actor, submittedByUserId: string | null): void {
+export function requireDifferentApprover(
+  actor: Pick<Actor, "userId">,
+  submittedByUserId: string | null,
+): void {
   if (actor.userId === null || submittedByUserId === null) return;
   if (actor.userId !== submittedByUserId) return;
 

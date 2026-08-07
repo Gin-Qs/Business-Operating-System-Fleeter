@@ -40,7 +40,13 @@ export const PERMISSIONS = [
   "quote:cost",
   "quote:approve",
   "quote:send",
+  // Registrar el desenlace del cliente sobre una versión enviada. Separado de
+  // `quote:send` a propósito: declarar una venta ganada alimenta el win rate de
+  // COM-001, y quien envía una propuesta no debería poder declararse ganador de
+  // ella sin que eso sea una facultad concedida explícitamente.
+  "quote:decide",
   "credit:read",
+  "credit:write",
   "credit:override",
   "transport_order:read",
   "transport_order:commit",
