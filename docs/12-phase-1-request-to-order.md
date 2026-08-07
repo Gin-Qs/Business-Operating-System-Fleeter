@@ -155,12 +155,23 @@ contracted_margin_pct = contracted_margin / quoted_revenue
 
 ## 11. Dependencias para escribir código
 
-Antes de implementar este contrato se deben fijar, por tenant piloto:
+| Decisión | Cómo se resuelve | ¿Bloquea el código? |
+|---|---|---|
+| Margen mínimo, moneda, aprobadores y vigencia de excepciones | Política `MIN_MARGIN`, editable en configuración | No |
+| Reglas de crédito, límite, aprobadores y vigencia de excepciones | Política `CREDIT`, editable en configuración | No |
+| Primer tipo de servicio, mercancía, rutas y unidades de medida | Maestros y catálogos que crea la propia Fase 1 | No |
+| Fuente de clientes y ubicaciones, criterio de maestro oficial | Configuración de integración por tenant | No |
+| Framework backend y proveedor de identidad | Decidido: Next.js como anfitrión del dominio y Supabase Auth | No |
 
-1. Primer tipo de servicio, mercancía, rutas y unidades de medida.
-2. Política de precio, margen mínimo, moneda y tipo de cambio.
-3. Reglas de crédito, aprobadores y duración de excepciones.
-4. Fuente de clientes/ubicaciones y criterio de maestro oficial.
-5. Framework backend y proveedor de identidad, documentados mediante ADR.
+Ninguna bloquea ya la implementación. Las dos primeras dejaron de ser constantes
+que un desarrollador escribe y pasaron a ser **configuración versionada** que un
+administrador publica, con alcance por cliente, entidad legal o sistema
+([docs/00 §6.7](00-product-charter.md)).
 
-Mientras estas decisiones se cierran, el contrato, pruebas de dominio y esquemas de API/evento pueden desarrollarse sin asumir reglas irreversibles.
+Eso invierte el orden habitual: en lugar de esperar a que el negocio fije un
+umbral para poder programar, el sistema se construye con el umbral como dato y
+el negocio lo ajusta cuando lo tenga claro, sin desplegar código y conservando
+la historia de qué regla estuvo vigente en cada momento.
+
+Lo que sigue siendo decisión del negocio —no del código— es **qué valores**
+publicar. Los de arranque son un punto de partida, no una recomendación.

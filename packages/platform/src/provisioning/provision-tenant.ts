@@ -1,4 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { appPool } from "../db/pool";
+import { withTenantTransaction } from "../db/unit-of-work";
+import { ensureDefaultPolicies } from "../policy/policy-store";
 
 /**
  * Provisionamiento de tenant (E00 de docs/09 §3).
@@ -57,9 +60,26 @@ export async function provisionTenant(
   );
 
   const row = rows[0]!;
-  return {
+  const provisioned = {
     tenantId: row.tenant_id,
     legalEntityId: row.legal_entity_id,
     membershipId: row.membership_id,
   };
+
+  // Los valores de arranque de las políticas viven en el registro de
+  // @fleeter/contracts, no en SQL: así hay una sola fuente para el esquema, el
+  // formulario de configuración y el default. Es idempotente, de modo que
+  // reejecutar el provisionamiento no crea versiones nuevas.
+  await withTenantTransaction(
+    {
+      tenantId: provisioned.tenantId,
+      actorType: "service",
+      actorId: null,
+      legalEntityId: provisioned.legalEntityId,
+      correlationId: input.correlationId ?? randomUUID(),
+    },
+    (tx) => ensureDefaultPolicies(tx),
+  );
+
+  return provisioned;
 }

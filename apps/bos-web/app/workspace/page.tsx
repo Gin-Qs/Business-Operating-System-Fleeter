@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import Link from "next/link";
 import { contextFor, withTenantTransaction } from "@fleeter/platform";
 import { signOut } from "../actions/auth";
 import { requireSession } from "../../lib/session";
@@ -65,14 +66,22 @@ export default async function WorkspacePage() {
               {session.active.baseCurrency} · {session.active.defaultTimezone}
             </p>
           </div>
-          <form action={signOut}>
-            <button
+          <div className="flex items-center gap-2">
+            <Link
               className="rounded-xl border border-[#cbd8d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#17332d] transition hover:border-[#267768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768]"
-              type="submit"
+              href="/workspace/configuracion"
             >
-              Cerrar sesión
-            </button>
-          </form>
+              Configuración
+            </Link>
+            <form action={signOut}>
+              <button
+                className="rounded-xl border border-[#cbd8d4] bg-white px-4 py-2.5 text-sm font-semibold text-[#17332d] transition hover:border-[#267768] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#267768]"
+                type="submit"
+              >
+                Cerrar sesión
+              </button>
+            </form>
+          </div>
         </header>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

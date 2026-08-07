@@ -5,5 +5,6 @@ export * from "./db/unit-of-work";
 export * from "./idempotency/idempotency";
 export * from "./outbox/outbox";
 export * from "./outbox/publisher";
+export * from "./policy/policy-store";
 export * from "./provisioning/provision-tenant";
 export * from "./session/actor";
