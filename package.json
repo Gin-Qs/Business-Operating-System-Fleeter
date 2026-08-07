@@ -2,13 +2,27 @@
   "name": "fleeter-bos",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=@fleeter/bos-web",
     "build": "npm run build --workspace=@fleeter/bos-web",
     "start": "npm run start --workspace=@fleeter/bos-web",
-    "typecheck": "npm run typecheck --workspace=@fleeter/bos-web"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:connection": "tsx --env-file-if-exists=.env.local scripts/check-connection.ts",
+    "provision:tenant": "tsx --env-file-if-exists=.env.local scripts/provision-tenant.ts",
+    "outbox:publish": "tsx --env-file-if-exists=.env.local packages/platform/src/outbox/publisher-cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "25.2.3",
+    "dotenv": "17.4.2",
+    "tsx": "4.23.9",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
   }
 }

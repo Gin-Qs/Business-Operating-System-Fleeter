@@ -23,8 +23,8 @@ export default function AccessPortalPage() {
                 </div>
               </div>
               <span className="hidden rounded-full border border-[#5fa18f]/40 bg-[#183a34]/80 px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#b6d9d0] sm:inline-flex">
-                FASE 1
-              </span>
+                FASE 0
+</span>
             </div>
 
             <div className="max-w-xl pt-16 sm:pt-24 lg:pt-28">

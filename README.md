@@ -14,13 +14,56 @@ Toda capacidad incluida debe cumplir cinco condiciones:
 4. Emitir evidencia o eventos auditables.
 5. Producir una métrica o resultado que permita mejorar el proceso.
 
-## Aplicación web
+## Estado de construcción
 
-El primer canal implementado es el portal de acceso de `apps/bos-web`, construido con Next.js y TypeScript. Corresponde al deployment unit **Web/admin/control tower** de la arquitectura técnica. Es una interfaz de acceso en modo demostración: valida el formulario localmente, muestra estados de carga y error, y deja explícito que todavía no autentica ni conserva sesiones.
+**Fase 0 — Fundación ejecutable: completa.** Tenant, identidad, autorización,
+auditoría, outbox transaccional e idempotencia funcionan de punta a punta y
+están cubiertos por pruebas contra una base real. La Fase 1
+([docs/12](docs/12-phase-1-request-to-order.md)) construye sobre esto.
+
+| Componente | Estado |
+|---|---|
+| Esquema por contexto, RLS y roles sin `BYPASSRLS` | Operativo |
+| Provisionamiento de tenant, membresías, roles y permisos | Operativo |
+| Auditoría inmutable y outbox con envelope canónico | Operativo |
+| Idempotencia de comandos | Operativo |
+| Worker de publicación con backoff y cola de errores | Operativo |
+| Autenticación real y espacio de trabajo por tenant | Operativo |
+| Capacidades de negocio (solicitud, cotización, orden) | Fase 1 |
+
+## Estructura
+
+```text
+apps/bos-web/          Canal web. Next.js: hospeda el dominio, no lo contiene
+packages/contracts/    Envelope de eventos, errores y catálogo de permisos
+packages/domain/       Dominio puro: Money, máquinas de estado, autorización
+packages/platform/     Infraestructura transversal: unidad de trabajo, auditoría,
+                       outbox, idempotencia, sesión
+supabase/migrations/   Esquema versionado
+scripts/               Verificación de entorno y provisionamiento
+tests/                 Dominio (puro) e integración (base real)
+```
+
+`packages/domain` no depende de ningún framework. Next.js es solo el anfitrión
+actual: extraer una API propia cuando haga falta ([docs/02 §6](docs/02-domain-architecture.md))
+no exige reescribir una sola regla de negocio.
+
+## Puesta en marcha
 
 ```powershell
 npm.cmd install --cache .npm-cache
+Copy-Item .env.example .env.local   # y rellenar
+npm.cmd run check:connection        # verifica conexión y aislamiento
 npm.cmd run dev
+```
+
+El alta del primer tenant y la gestión de credenciales están en
+[runbook 00](docs/runbooks/00-entornos-y-credenciales.md).
+
+```powershell
+npm.cmd run typecheck    # los cuatro paquetes
+npm.cmd test             # dominio + integración
+npm.cmd run outbox:publish -- --loop
 ```
 
 ## Índice de la especificación
