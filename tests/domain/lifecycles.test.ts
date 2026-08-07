@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countsInWinRate,
   quoteLifecycle,
   serviceRequestLifecycle,
   transportOrderLifecycle,
@@ -66,6 +67,47 @@ describe("ciclo de vida de la cotización", () => {
 
   it("no permite aceptar una cotización que no se envió", () => {
     expect(quoteLifecycle.canTransition("Approved", "Accepted")).toBe(false);
+  });
+
+  describe("los dos rechazos son hechos distintos", () => {
+    // docs/03 §7. La distinción no es cosmética: COM-001 define win rate como
+    // aceptadas / (aceptadas + rechazadas), y una versión que el cliente nunca
+    // vio no puede contar como derrota comercial.
+
+    it("el aprobador interno rechaza desde PendingApproval", () => {
+      expect(quoteLifecycle.canTransition("PendingApproval", "ChangesRequested")).toBe(true);
+    });
+
+    it("el cliente solo puede rechazar lo que se le envió", () => {
+      expect(quoteLifecycle.canTransition("Sent", "Rejected")).toBe(true);
+      expect(quoteLifecycle.canTransition("PendingApproval", "Rejected")).toBe(false);
+      expect(quoteLifecycle.canTransition("Costed", "Rejected")).toBe(false);
+      expect(quoteLifecycle.canTransition("Approved", "Rejected")).toBe(false);
+    });
+
+    it("el aprobador no puede rechazar algo que ya salió al cliente", () => {
+      expect(quoteLifecycle.canTransition("Sent", "ChangesRequested")).toBe(false);
+      expect(quoteLifecycle.canTransition("Approved", "ChangesRequested")).toBe(false);
+    });
+
+    it("solo el rechazo del cliente cuenta en el win rate", () => {
+      expect(countsInWinRate("Accepted")).toBe(true);
+      expect(countsInWinRate("Rejected")).toBe(true);
+      // Si esto fuera true, el KPI reportaría una tasa de éxito peor que la
+      // real cada vez que pricing tuviera que recostear.
+      expect(countsInWinRate("ChangesRequested")).toBe(false);
+      expect(countsInWinRate("PendingApproval")).toBe(false);
+    });
+
+    it("ambos rechazos son terminales: recostear crea una versión nueva", () => {
+      // docs/02 §BC-02: cada cotización referencia una versión inmutable de
+      // costos y supuestos, así que no se vuelve a Costed sobre la misma.
+      expect(quoteLifecycle.isTerminal("ChangesRequested")).toBe(true);
+      expect(quoteLifecycle.isTerminal("Rejected")).toBe(true);
+      expect(() => quoteLifecycle.assertTransition("ChangesRequested", "Costed")).toThrowError(
+        /estado terminal/,
+      );
+    });
   });
 });
 

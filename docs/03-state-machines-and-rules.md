@@ -104,9 +104,37 @@ Cada requisito de evidencia proviene del contrato/cliente y conserva tipo, canti
 ```text
 Draft → Costed → PendingApproval → Approved → Sent
 → Viewed → Accepted | Rejected | Expired | Withdrawn
+PendingApproval → ChangesRequested
+Approved/Sent/Viewed → Withdrawn
 ```
 
 Editar precio, alcance o supuesto después de `Approved` genera nueva versión.
+
+#### Los dos rechazos son hechos distintos
+
+`ChangesRequested` y `Rejected` parecen el mismo desenlace y no lo son:
+
+| | `ChangesRequested` | `Rejected` |
+|---|---|---|
+| Quién decide | Aprobador comercial o crédito | Cliente |
+| Qué ocurrió | La versión incumple una política interna | La propuesta llegó al mercado y perdió |
+| El cliente la vio | No | Sí |
+| Cuenta en win rate | **No** | Sí |
+| Continuación | Pricing costea una versión nueva | Contrapropuesta u oportunidad perdida |
+
+La distinción no es cosmética: [`COM-001`](../catalogs/kpi-catalog.csv) define win rate como
+`aceptadas / (aceptadas + rechazadas)`. Colapsar ambos rechazos en un solo estado
+metería en el denominador versiones que el cliente nunca vio, y el KPI reportaría
+una tasa de éxito peor que la real cada vez que pricing tuviera que recostear.
+
+`ChangesRequested` es **terminal para su versión**. No se vuelve a `Costed`:
+[docs/02 §BC-02](02-domain-architecture.md) exige que cada cotización referencie
+una versión inmutable de costos y supuestos, así que recostear produce una
+versión nueva que conserva la anterior con su motivo de rechazo y su aprobador.
+
+`Expired`, `Withdrawn` y `Viewed` pertenecen a la máquina canónica pero exigen
+temporizadores (PS-03) y el portal de cliente, así que se implementan cuando esas
+capacidades existan. Ninguna fase declara un camino que su código no ejecute.
 
 ### Contrato
 

@@ -70,10 +70,19 @@ Todos los importes se persisten con moneda, escala decimal y tipo de cambio vers
 | Cotización | `Draft → Costed` | Escenario de costo y supuestos versionados. |
 | Cotización | `Costed → PendingApproval` | Margen o condición requiere decisión. |
 | Cotización | `Costed/PendingApproval → Approved` | Política satisfecha o excepción vigente. |
-| Cotización | `Approved → Sent → Accepted` | Envío y aceptación con actor, canal y timestamp. |
+| Cotización | `PendingApproval → ChangesRequested` | El aprobador rechaza por política; motivo obligatorio. |
+| Cotización | `Approved → Sent` | Envío con actor, canal y timestamp. |
+| Cotización | `Sent → Accepted` | Aceptación del cliente con actor, canal y timestamp. |
+| Cotización | `Sent → Rejected` | Rechazo del cliente con motivo registrado. |
 | Orden | `Draft → Validated → Committed` | Solicitud aceptada, versión de cotización elegida, contrato/perfil y crédito vigentes. |
 
 Un cambio en alcance, precio, costo, moneda o supuesto de una cotización aprobada crea una versión nueva. No se altera la versión que originó una orden.
+
+`ChangesRequested` (rechazo del aprobador interno) y `Rejected` (rechazo del
+cliente) son estados separados a propósito: solo el segundo cuenta en el win
+rate de `COM-001`. La justificación completa está en
+[docs/03 §7](03-state-machines-and-rules.md). Ambos son terminales para su
+versión; recostear produce una versión nueva.
 
 ## 6. Comandos, eventos y respuestas
 
@@ -84,7 +93,9 @@ Un cambio en alcance, precio, costo, moneda o supuesto de una cotización aproba
 | `CostQuote` | Cotización | `QuoteCosted` | Cotización `Costed` con desglose de costo y margen. |
 | `RequestQuoteApproval` | Cotización | `QuoteApprovalRequested` | Cotización `PendingApproval` y política aplicable. |
 | `ApproveQuote` | Cotización | `QuoteApproved` | Versión aprobada, decisión y vigencia de excepción si aplica. |
+| `RejectQuoteApproval` | Cotización | `QuoteChangesRequested` | Versión en `ChangesRequested` con aprobador y motivo; no cuenta en win rate. |
 | `SendQuote` | Cotización | `QuoteSent` | Cotización enviada con canal y destinatario. |
+| `RecordQuoteRejection` | Cotización | `QuoteRejected` | Versión en `Rejected` con motivo del cliente; sí cuenta en win rate. |
 | `AcceptServiceRequest` | Solicitud | `ServiceRequestAccepted` | Solicitud `Accepted` y referencias comerciales evaluadas. |
 | `CommitTransportOrder` | Orden | `TransportOrderCommitted` | Orden `Committed` ligada a solicitud y versión de cotización. |
 
@@ -128,6 +139,7 @@ contracted_margin_pct = contracted_margin / quoted_revenue
 2. Dada una solicitud sin origen, cuando se intenta enviar, entonces queda en `NeedsInformation` con la causa `origin_required` y no genera cotización.
 3. Dada una cotización aprobada, cuando cambia el precio, entonces se crea una versión nueva y la versión previa conserva sus importes, aprobaciones y eventos.
 4. Dada una cotización bajo el margen mínimo, cuando se intenta aprobar sin excepción vigente, entonces se rechaza sin cambiar el estado ni emitir `QuoteApproved`.
+4b. Dada una cotización en `ChangesRequested`, cuando se calcula el win rate del periodo, entonces esa versión no aparece ni en el numerador ni en el denominador de `COM-001`; una en `Rejected` sí aparece en el denominador.
 5. Dada una solicitud con crédito en hold, cuando se intenta aceptar sin excepción, entonces se rechaza y registra la regla aplicada.
 6. Dada una solicitud aceptada y el mismo `idempotency_key`, cuando `CommitTransportOrder` se reintenta, entonces retorna la misma orden y no emite un segundo evento.
 7. Dada una orden comprometida, cuando se consulta su historia, entonces se puede reconstruir solicitud, versión de cotización, política, actor, motivo, timestamps y correlación.

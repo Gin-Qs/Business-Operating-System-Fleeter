@@ -59,7 +59,10 @@ El payload contiene solo lo necesario para el consumidor. Datos restringidos se 
 ### Comercial
 
 - `LeadQualified`, `OpportunityOpened`, `QuoteCosted`, `QuoteApproved`, `QuoteSent`.
-- `QuoteAccepted`, `QuoteRejected`, `QuoteExpired`.
+- `QuoteChangesRequested`, `QuoteAccepted`, `QuoteRejected`, `QuoteExpired`.
+
+`QuoteChangesRequested` lo emite el aprobador interno; `QuoteRejected`, el cliente.
+Son hechos distintos y solo el segundo alimenta el win rate (docs/03 §7).
 - `ContractActivated`, `ContractSuspended`, `RateCardPublished`.
 - `CreditLimitChanged`, `CreditHoldPlaced`, `CreditHoldReleased`.
 

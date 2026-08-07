@@ -39,7 +39,7 @@ El catálogo machine-readable completo está en `catalogs/kpi-catalog.csv`.
 
 | KPI | Fórmula | Uso |
 |---|---|---|
-| Win rate | cotizaciones aceptadas / cotizaciones con decisión accepted o rejected | Calidad de propuesta |
+| Win rate | cotizaciones aceptadas / cotizaciones con decisión **del cliente** (`Accepted` o `Rejected`) | Calidad de propuesta |
 | Quote turnaround | `sent_at - request_complete_at`; mediana y p90 | Capacidad comercial |
 | Price realization | ingreso neto facturado / valor contratado para el mismo volumen y accesorios | Fugas de precio |
 | Contracted margin | `(quoted_revenue - quoted_cost) / quoted_revenue` | Aprobación de precio |
