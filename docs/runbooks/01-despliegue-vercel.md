@@ -5,26 +5,43 @@ Corresponde al deployment unit **Web/admin/control tower** de
 **no** va aquí: es un proceso distinto, con otro patrón de carga y otro modo de
 falla (ver §5).
 
-## 1. Importar el repositorio
+## 1. Root Directory — el único ajuste manual
 
-Vercel → **Add New → Project → Import Git Repository** →
-`Gin-Qs/Business-Operating-System-Fleeter`.
+El proyecto `business-operating-system-fleeter` ya está conectado al repositorio
+y despliega en cada push. Falta un ajuste, y sin él **todos los builds fallan**
+con:
 
-En la pantalla de configuración:
+```text
+STATIC_BUILD_NO_OUT_DIR
+No Output Directory named "public" found after the Build completed.
+```
+
+Ese error engaña: el build compila bien. Lo que ocurre es que Vercel construye
+desde la raíz del repositorio, `npm run build` genera la salida en
+`apps/bos-web/.next`, y Vercel no la busca ahí porque en la raíz no detecta
+ninguna app de Next.js. Al no reconocer framework, cae a un build estático y
+busca `public/`.
+
+**Vercel → Settings → Build and Deployment → Root Directory → `apps/bos-web`**
 
 | Ajuste | Valor |
 |---|---|
-| Framework Preset | Next.js (se detecta solo) |
 | **Root Directory** | `apps/bos-web` |
 | Include files outside root directory | **Activado** |
+| Framework Preset | Next.js (se detecta al corregir la raíz) |
 | Build / Install / Output Command | Dejar en automático |
 
-El **Root Directory** es el único ajuste que hay que tocar y el que más se
-equivoca. El repositorio es un monorepo con workspaces de npm: Vercel detecta el
-`package-lock.json` de la raíz e instala desde ahí, pero necesita saber cuál de
-las apps compilar. La casilla de incluir archivos fuera de la raíz es obligatoria
-porque `apps/bos-web` importa `packages/domain`, `packages/contracts` y
-`packages/platform`.
+La casilla de incluir archivos fuera de la raíz es obligatoria: `apps/bos-web`
+importa `packages/domain`, `packages/contracts` y `packages/platform`. Vercel
+sigue instalando desde el `package-lock.json` de la raíz porque detecta los
+workspaces de npm.
+
+Con la raíz corregida, `apps/bos-web/vercel.json` pasa a aplicarse y con él las
+cabeceras de seguridad.
+
+> Para importar el proyecto desde cero: **Add New → Project → Import Git
+> Repository → `Gin-Qs/Business-Operating-System-Fleeter`**, y fijar el Root
+> Directory en la misma pantalla de importación.
 
 `apps/bos-web/vercel.json` ya lleva las cabeceras de seguridad (HSTS, nosniff,
 `frame-ancestors 'none'`, Referrer-Policy) y desactiva el cache de `/api/*`.
@@ -107,7 +124,20 @@ Opciones, en orden de sencillez:
 Mientras no exista ninguna, los eventos quedan en `plt.outbox` con
 `status = 'pending'`. No se pierden, pero tampoco llegan a ningún consumidor.
 
-## 6. Antes de exponerlo a usuarios reales
+## 6. El repositorio es público
+
+`Gin-Qs/Business-Operating-System-Fleeter` está marcado como **público** en
+GitHub. Eso significa que cualquiera puede leer no solo el código, sino la
+especificación completa del negocio: modelo operativo, catálogo de KPIs con sus
+fórmulas, umbrales de margen por defecto y arquitectura de datos.
+
+No hay credenciales expuestas —`.env.local` está en `.gitignore` y se verificó
+que nunca entró a un commit; el único certificado versionado es la CA pública de
+Supabase—. Pero conviene decidir a conciencia si la documentación de negocio
+debe ser pública. Si no, **Settings → General → Change repository visibility →
+Private**; ni Vercel ni el CI se ven afectados.
+
+## 7. Antes de exponerlo a usuarios reales
 
 - **Protección de despliegues:** los previews son públicos salvo que se active
   Vercel Authentication en Settings → Deployment Protection.
