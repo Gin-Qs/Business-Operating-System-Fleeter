@@ -1,0 +1,31 @@
+{
+  "name": "@fleeter/bos-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fleeter/contracts": "0.1.0",
+    "@fleeter/domain": "0.1.0",
+    "@fleeter/platform": "0.1.0",
+    "@phosphor-icons/react": "2.1.10",
+    "@supabase/ssr": "0.12.4",
+    "@supabase/supabase-js": "2.112.2",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "25.2.3",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "dotenv": "17.4.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
+  }
+}
