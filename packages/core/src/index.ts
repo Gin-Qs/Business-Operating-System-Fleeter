@@ -14,6 +14,7 @@ export * as commercial from "./commercial";
 export * as transport from "./transport";
 export * from "./shared/execute";
 export { assertRevision } from "./shared/command";
+export type { Tx } from "./shared/command";
 export {
   QUOTE_DB,
   SERVICE_REQUEST_DB,
