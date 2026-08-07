@@ -166,11 +166,30 @@ Supabase—. Pero conviene decidir a conciencia si la documentación de negocio
 debe ser pública. Si no, **Settings → General → Change repository visibility →
 Private**; ni Vercel ni el CI se ven afectados.
 
-## 7. Antes de exponerlo a usuarios reales
+## 7. Protección de despliegues
 
-- **Protección de despliegues:** los previews son públicos salvo que se active
-  Vercel Authentication en Settings → Deployment Protection.
+**Vercel Authentication está activada** en este proyecto para todos los
+despliegues salvo dominios propios. Es la configuración correcta y conviene
+dejarla así mientras la app apunte a la base real.
+
+Consecuencias prácticas:
+
+- Abrir una URL de preview **sin sesión de Vercel** devuelve la pantalla de
+  login, no la aplicación. No es un fallo del despliegue.
+- Un `curl` contra el preview devuelve HTTP 200 con el HTML de Vercel, lo que
+  despista: parece que la app respondió. Se distingue porque el cuerpo trae
+  clases `geist`/`dash` en lugar del portal.
+- Cualquier persona a quien se le comparta un preview necesita acceso al equipo
+  de Vercel.
+
+Para verificar desde fuera sin desactivar la protección, Settings → Deployment
+Protection → **Protection Bypass for Automation** genera un token para usar en
+peticiones automatizadas.
+
+## 8. Antes de exponerlo a usuarios reales
+
 - **Rate limiting:** todavía no hay. El portal de acceso admite intentos
   ilimitados; Supabase Auth aplica los suyos, pero el BOS no añade ninguno.
 - **Dominio propio:** una URL `*.vercel.app` sirve para revisar avances, no para
-  operar.
+  operar. Al añadir uno, la protección SSO deja de aplicarle
+  (`all_except_custom_domains`), así que ese dominio queda expuesto.
