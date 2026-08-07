@@ -10,7 +10,7 @@ Solicitud completa → cotización versionada → aprobación o excepción
 
 ## 1. Antes de empezar
 
-El tenant tiene que existir ([runbook 00 §5](00-entornos-y-credenciales.md)) y la
+El tenant tiene que existir ([runbook 00 §6](00-entornos-y-credenciales.md)) y la
 persona que va a operar necesita **el rol adecuado, no el de administrador**.
 
 Esto sorprende la primera vez: `tenant_admin` no puede crear un cliente ni
@@ -18,27 +18,20 @@ aprobar una cotización. No es un descuido, es [docs/12 §3](../12-phase-1-reque
 comercial, pricing, aprobador, crédito y operaciones son facultades distintas, y
 quien configura el sistema no debería poder además cerrar ventas en él.
 
-Para operar hacen falta membresías reales:
+Los roles se conceden en **Espacio de trabajo → Equipo**: se invita por correo,
+la persona activa su acceso desde el portal y queda operativa. El propietario
+puede invitarse a sí mismo si opera solo.
 
-```powershell
-npm.cmd run grant:role -- `
-  --tenant <uuid del tenant> `
-  --user-id <uuid de auth.users> `
-  --email persona@empresa.mx `
-  --role commercial_executive `
-  --granted-by <uuid de quien concede>
-```
-
-El script imprime los permisos efectivos resultantes, que es la unión de todas
-las membresías activas de esa persona en el tenant.
+Un recorrido completo necesita al menos **dos personas**: la política
+`MIN_MARGIN` trae `requires_maker_checker` activo, así que quien pide una
+excepción de margen no puede concederla
+([docs/03 §14.3](../03-state-machines-and-rules.md)). Con una sola persona todo
+funciona salvo aprobar por debajo del umbral.
 
 Los roles disponibles y qué permite cada uno están en
-[migración 0005](../../supabase/migrations/0005_seed_system_roles.sql).
-
-Una misma persona puede tener varias membresías; sus permisos se unen. Lo que
-**no** se puede es que quien pide una excepción de margen la apruebe: la política
-`MIN_MARGIN` trae `requires_maker_checker` activo y hacen falta dos personas
-([docs/03 §14.3](../03-state-machines-and-rules.md)).
+[migración 0005](../../supabase/migrations/0005_seed_system_roles.sql), y la
+pantalla de Equipo enseña los permisos exactos de cada rol antes de concederlo.
+Una misma persona puede acumular membresías; sus permisos se unen.
 
 ## 2. Configurar antes de operar
 

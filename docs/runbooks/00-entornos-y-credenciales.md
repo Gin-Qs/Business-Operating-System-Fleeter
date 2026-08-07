@@ -100,6 +100,34 @@ entidad ni evento.
 
 3. Iniciar sesión en `http://localhost:3000`.
 
+### El propietario todavía no puede operar
+
+Y no es un fallo. El provisionamiento concede `tenant_admin`, que configura el
+tenant pero **no crea clientes, no cotiza y no aprueba**:
+[docs/12 §3](../12-phase-1-request-to-order.md) separa gobierno de operación a
+propósito, y quien administra el sistema no debería poder además cerrar ventas
+en él sin que nadie lo haya decidido.
+
+El camino es **Espacio de trabajo → Equipo**, donde el propietario invita por
+correo con el rol que corresponda. Puede invitarse a sí mismo si opera solo: es
+una decisión legítima en una operación pequeña, queda auditada, y no debilita la
+regla que de verdad protege —nadie aprueba lo que él mismo solicitó
+([docs/03 §14.3](../03-state-machines-and-rules.md))—, porque esa mira a la
+persona y no al rol.
+
+La persona invitada entra al portal con ese mismo correo, usa **"Me invitaron y
+aún no tengo contraseña"** para crear su credencial, y al ingresar su acceso ya
+está activo.
+
+Fuera de la interfaz, el mismo alta se hace con:
+
+```bash
+npm run grant:role -- --tenant <uuid> --user-id <uuid> --email persona@empresa.mx --role commercial_executive
+```
+
+Ese camino exige conocer el UUID de una identidad ya existente, así que sirve
+para automatizar, no para el uso diario.
+
 ## 7. Datos de prueba
 
 `supabase/seed/test-fixtures.sql` crea tres identidades para las pruebas de

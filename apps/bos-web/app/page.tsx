@@ -1,4 +1,5 @@
 import { ArrowUpRight, ShieldCheck, Waveform } from "@phosphor-icons/react/dist/ssr";
+import { ActivationForm } from "./components/activation-form";
 import { PortalMark } from "./components/portal-mark";
 import { SignInForm } from "./components/sign-in-form";
 
@@ -23,8 +24,8 @@ export default function AccessPortalPage() {
                 </div>
               </div>
               <span className="hidden rounded-full border border-[#5fa18f]/40 bg-[#183a34]/80 px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] text-[#b6d9d0] sm:inline-flex">
-                FASE 0
-</span>
+                FASE 1
+              </span>
             </div>
 
             <div className="max-w-xl pt-16 sm:pt-24 lg:pt-28">
@@ -91,8 +92,11 @@ export default function AccessPortalPage() {
 
             <SignInForm />
 
-            <div className="mt-9 border-t border-[#dbe5e1] pt-5 text-xs leading-5 text-[#71847e]">
-              Acceso administrado por tenant. Si aún no tienes una cuenta, solicita una invitación a la administración de tu empresa.
+            <div className="mt-9 space-y-3 border-t border-[#dbe5e1] pt-5 text-xs leading-5 text-[#71847e]">
+              <p>
+                Acceso administrado por tenant. Si aún no tienes una cuenta, solicita una invitación a la administración de tu empresa.
+              </p>
+              <ActivationForm />
             </div>
           </div>
         </section>

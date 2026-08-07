@@ -27,7 +27,8 @@ contra una base real con row level security activo.
 | Componente | Estado |
 |---|---|
 | Esquema por contexto, RLS y roles sin `BYPASSRLS` | Operativo |
-| Provisionamiento de tenant, alta y revocación de membresías | Operativo |
+| Provisionamiento de tenant | Operativo |
+| Invitar, activar, conceder y revocar accesos desde el producto | Operativo |
 | Auditoría inmutable y outbox con envelope canónico | Operativo |
 | Idempotencia de comandos y auditoría de rechazos | Operativo |
 | Worker de publicación con backoff y cola de errores | Operativo |
@@ -75,6 +76,14 @@ npm.cmd run dev
 El alta del primer tenant y la gestión de credenciales están en
 [runbook 00](docs/runbooks/00-entornos-y-credenciales.md). Para recorrer el ciclo
 de negocio completo, [runbook 02](docs/runbooks/02-fase-1-solicitud-a-orden.md).
+
+Un detalle que sorprende al arrancar: el propietario recibe `tenant_admin`, que
+configura el tenant pero **no crea clientes, no cotiza y no aprueba**
+([docs/12 §3](docs/12-phase-1-request-to-order.md) separa gobierno de operación).
+Los roles operativos se conceden en **Espacio de trabajo → Equipo**, invitando
+por correo; el propietario puede invitarse a sí mismo si opera solo. Esa
+concesión queda auditada y no debilita la regla que de verdad protege: nadie
+aprueba lo que él mismo solicitó, y esa mira a la persona, no al rol.
 
 ```powershell
 npm.cmd run typecheck    # los cinco paquetes

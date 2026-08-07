@@ -15,6 +15,15 @@ export const FIXTURE_USERS = {
   alphaOwner: "11111111-1111-4111-8111-111111111111",
   betaOwner: "22222222-2222-4222-8222-222222222222",
   alphaAuditor: "33333333-3333-4333-8333-333333333333",
+  /** Sin membresía: existe para probar el alta por invitación. */
+  alphaInvitee: "44444444-4444-4444-8444-444444444444",
+} as const;
+
+export const FIXTURE_EMAILS = {
+  alphaOwner: "alpha.owner@fleeter.test",
+  betaOwner: "beta.owner@fleeter.test",
+  alphaAuditor: "alpha.auditor@fleeter.test",
+  alphaInvitee: "alpha.invitee@fleeter.test",
 } as const;
 
 /** En CI sin credenciales, las pruebas de integración se saltan solas. */
