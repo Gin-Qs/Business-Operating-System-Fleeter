@@ -16,7 +16,8 @@ export type PolicyField =
   | { name: string; label: string; kind: "currency"; help?: string }
   | { name: string; label: string; kind: "int"; min: number; max: number; help?: string }
   | { name: string; label: string; kind: "boolean"; help?: string }
-  | { name: string; label: string; kind: "permissions"; help?: string };
+  | { name: string; label: string; kind: "permissions"; help?: string }
+  | { name: string; label: string; kind: "causes"; help?: string };
 
 export const POLICY_FIELDS: Record<PolicyCode, readonly PolicyField[]> = {
   MIN_MARGIN: [
@@ -78,6 +79,35 @@ export const POLICY_FIELDS: Record<PolicyCode, readonly PolicyField[]> = {
       name: "exception_approver_permissions",
       label: "Quién autoriza una excepción de crédito",
       kind: "permissions",
+    },
+  ],
+  RELEASE_GATE: [
+    {
+      name: "exceptionable_causes",
+      label: "Causas que admiten excepción",
+      kind: "causes",
+      help:
+        "Una causa fuera de esta lista NUNCA se libera, ni con excepción. Aquí la empresa " +
+        "traza la línea entre el riesgo que alguien puede asumir y el que no debería poder.",
+    },
+    {
+      name: "exception_max_days",
+      label: "Vigencia máxima de la excepción (días)",
+      kind: "int",
+      min: 1,
+      max: 365,
+    },
+    {
+      name: "exception_approver_permissions",
+      label: "Quién puede autorizar",
+      kind: "permissions",
+      help: "Permisos que facultan a conceder una excepción de liberación.",
+    },
+    {
+      name: "allow_self_approval",
+      label: "Permitir que quien pide la excepción la conceda",
+      kind: "boolean",
+      help: "docs/03 §14.3 lo desaconseja: nadie debería aprobar lo que él mismo solicitó.",
     },
   ],
 };
