@@ -1,4 +1,5 @@
 export * from "./authorization";
+export * from "./document-render";
 export * from "./lifecycles";
 export * from "./money";
 export * from "./policy-evaluation";

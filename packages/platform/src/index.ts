@@ -3,6 +3,8 @@ export * from "./audit/denied-attempt";
 export * from "./config";
 export * from "./db/pool";
 export * from "./db/unit-of-work";
+export * from "./documents/bindings";
+export * from "./documents/templates";
 export * from "./exceptions/exception-decision";
 export * from "./idempotency/idempotency";
 export * from "./outbox/outbox";

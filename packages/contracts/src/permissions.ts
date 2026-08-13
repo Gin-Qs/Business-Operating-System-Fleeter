@@ -50,6 +50,53 @@ export const PERMISSIONS = [
   "credit:override",
   "transport_order:read",
   "transport_order:commit",
+
+  // Capacidad y ejecución — BC-04 / BC-03, alcance de docs/13
+  "vehicle:read",
+  "vehicle:write",
+  "trailer:read",
+  "trailer:write",
+  "driver:read",
+  "driver:write",
+  "credential:read",
+  "credential:write",
+  // Retirar un activo de circulación. Separado de `vehicle:write` porque
+  // bloquear detiene operación y capturar una ficha no.
+  "resource:block",
+  "shipment:read",
+  "shipment:write",
+  "route_plan:read",
+  "route_plan:write",
+  "trip:read",
+  "trip:plan",
+  "trip:assign",
+  "trip:confirm",
+  "trip:release",
+  // Ejecutar NO concede la flota: el alcance por asignación confirmada lo
+  // aplica el núcleo (docs/13 §12.5).
+  "trip:execute",
+  "trip:close",
+  // Autorizar la liberación de un viaje contra un gate incumplido. Es a
+  // `trip:release` lo que `credit:override` es a `credit:write`: quien pide la
+  // excepción no puede concederla.
+  "release:override",
+  "trip_exception:raise",
+  "trip_exception:close",
+  "evidence:read",
+  "evidence:submit",
+  "evidence:validate",
+  "evidence:waive",
+
+  // Configuración transversal
+  "catalog:read",
+  "catalog:write",
+  // Subir un formato, publicarlo y emitir con él son tres decisiones distintas:
+  // quien redacta la plantilla de contrato no debería poder ponerla en
+  // producción sin que nadie más la mire.
+  "document_template:read",
+  "document_template:write",
+  "document_template:publish",
+  "document:render",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -58,7 +105,7 @@ const PERMISSION_SET: ReadonlySet<string> = new Set(PERMISSIONS);
 
 export const isPermission = (value: string): value is Permission => PERMISSION_SET.has(value);
 
-/** Códigos de los roles de sistema sembrados por la migración 0005. */
+/** Códigos de los roles de sistema sembrados por las migraciones 0005 y 0017. */
 export const SYSTEM_ROLES = [
   "tenant_admin",
   "commercial_executive",
@@ -67,6 +114,9 @@ export const SYSTEM_ROLES = [
   "credit_officer",
   "operations",
   "auditor",
+  "dispatcher",
+  "driver",
+  "fleet_manager",
 ] as const;
 
 export type SystemRoleCode = (typeof SYSTEM_ROLES)[number];
