@@ -17,12 +17,18 @@ Toda capacidad incluida debe cumplir cinco condiciones:
 ## Estado de construcción
 
 **Fase 0 — Fundación ejecutable: completa.** **Fase 1 — Solicitud a Orden:
-completa.** Una necesidad de transporte se captura, se cotiza por versiones
-inmutables, se aprueba contra una política configurable y se convierte en una
-orden comprometida, con auditoría, eventos e idempotencia en cada transición.
-Los siete criterios de aceptación de
-[docs/12 §9](docs/12-phase-1-request-to-order.md) tienen una prueba cada uno
-contra una base real con row level security activo.
+completa.** **Fase 2 — Orden a Entrega: núcleo y API completos.** Una necesidad
+de transporte se captura, se cotiza por versiones inmutables, se aprueba contra
+una política configurable, se convierte en una orden comprometida y se ejecuta
+como un viaje con recursos elegibles, paradas, entrega y evidencia — con
+auditoría, eventos e idempotencia en cada transición.
+
+La transición que define la Fase 2 es `Confirmed → Released`. El **gate de
+liberación** de [docs/03 §4](docs/03-state-machines-and-rules.md) se evalúa como
+regla y no como costumbre: devuelve las causas que impiden salir, no un "no".
+Una unidad con la verificación vencida o una carga que no cabe detienen el viaje
+antes del portón, y eximir de eso exige una excepción que **nombra la causa**
+que autoriza.
 
 | Componente | Estado |
 |---|---|
@@ -37,7 +43,14 @@ contra una base real con row level security activo.
 | Cliente, contacto, ubicación, perfil de servicio y crédito | Operativo |
 | Solicitud, cotización versionada, excepciones y orden comprometida | Operativo |
 | API `/v1` con `Idempotency-Key`, `If-Match` y correlación | Operativo |
-| Planeación, viaje, entrega, evidencia y facturación | Fase 2 |
+| Catálogos configurables por tenant | Operativo |
+| Plantillas de documento con enlaces verificados | Operativo |
+| Unidad, remolque, operador y credenciales con vigencia | Operativo |
+| Carga, paradas, plan de ruta versionado y viaje | Operativo |
+| Gate de liberación con causas y excepción por causa | Operativo |
+| Ejecución de paradas, entrega derivada y evidencia | Operativo |
+| Pantallas de flota y viajes | Fase 2, pendiente |
+| Cargos, factura, pago y margen final | Fase 3 |
 
 ## Estructura
 
@@ -101,6 +114,46 @@ estado que vale la pena mirar, incluido un margen bajo umbral y un crédito
 bloqueado— y una invitación por rol
 ([runbook 00 §7](docs/runbooks/00-entornos-y-credenciales.md)).
 
+## Configuración: catálogos y formatos
+
+Dos cosas que en la mayoría de los sistemas exigen un desarrollador, aquí son
+datos del tenant.
+
+**Catálogos.** Tipo de servicio, tipo de equipo, mercancía, credencial,
+evidencia, motivos y unidades de medida viven en `plt.catalog` y los edita quien
+administra el tenant. No es cosmético: el gate de liberación compara el equipo
+que pide la orden contra el del remolque, y con texto libre `"Caja seca 53"` y
+`"caja seca 53'"` son distintos — un viaje legítimo detenido por una comilla.
+
+Los catálogos **llegan vacíos a propósito**. Un tenant nuevo no recibe una flota
+de ejemplo que después tenga que distinguir de la suya. La única excepción son
+los vocabularios que no son del tenant sino del mundo: kilogramo, tonelada,
+tarima.
+
+**Formatos de documento.** El tenant sube su cotización o su contrato —con su
+papelería y su redacción— y declara qué dato del sistema llena cada marcador.
+El sistema los llena; no los redacta.
+
+Tres reglas impiden que salga un documento con huecos o con datos inventados, y
+las tres viven en la base y en el dominio, no en la pantalla:
+
+1. **Un campo sin enlace impide publicar.** Si el formato trae `{{rfc_cliente}}`
+   y nadie dijo de dónde sale, no se publica.
+2. **Un enlace solo apunta a un dato que existe.** El catálogo de rutas lo
+   publica el producto y refleja lo que el código sabe resolver; una prueba
+   compara las dos listas para que no se separen en silencio.
+3. **Un obligatorio vacío bloquea la emisión** y devuelve la lista exacta de lo
+   que falta. No imprime hueco ni rellena por su cuenta. El texto para las
+   ausencias legítimas lo escribe el tenant, y entonces es suyo.
+
+El motor es sustitución pura: no hay modelo de lenguaje en el camino. Un
+documento que se firma no se redacta por inferencia.
+
+Hoy se pueden emitir **cotización** y **orden de transporte**. El contrato
+todavía no: la entidad `ContractVersion` (COM-007) no existe, y ofrecer enlaces
+de contrato sin contratos sería la misma promesa vacía que este subsistema
+impide hacer a los demás.
+
 ## API
 
 El ciclo de negocio se opera por HTTP ([docs/12 §7](docs/12-phase-1-request-to-order.md)).
@@ -130,7 +183,36 @@ POST   /v1/quotes/{id}/send
 POST   /v1/quotes/{id}/decision
 
 POST   /v1/transport-orders                           GET /v1/transport-orders/{id}
+
+POST   /v1/vehicles     /v1/trailers    /v1/drivers    /v1/credentials
+POST   /v1/vehicles/{id}/block                        POST /v1/vehicles/{id}/release
+
+POST   /v1/transport-orders/{id}/shipments
+POST   /v1/transport-orders/{id}/stops
+POST   /v1/transport-orders/{id}/route-plans          POST /v1/route-plans/{id}/activate
+
+POST   /v1/trips                                      GET /v1/trips/{id}
+POST   /v1/trips/{id}/assign                          POST /v1/trips/{id}/confirm-assignment
+GET    /v1/trips/{id}/release-check                   POST /v1/trips/{id}/release
+POST   /v1/trips/{id}/start                           POST /v1/trips/{id}/close
+GET    /v1/trips/{id}/stops                           GET  /v1/trips/{id}/evidence
+
+POST   /v1/stop-executions/{id}/arrive                POST /v1/stop-executions/{id}/outcome
+POST   /v1/evidence-requirements/{id}/submit          POST /v1/evidence-requirements/{id}/waive
+POST   /v1/evidence-submissions/{id}/accept           POST /v1/evidence-submissions/{id}/reject
 ```
+
+Tres respuestas que sorprenden y son deliberadas:
+
+- `POST /v1/trips/{id}/release` devuelve **200 con `released: false`** y la lista
+  de causas cuando el gate no pasa. La petición fue válida; lo que falta es un
+  dato o un permiso, no un reintento.
+- `POST /v1/stop-executions/{id}/outcome` **no acepta el desenlace**. Se deriva
+  de las cantidades: aceptarlo permitiría marcar "completa" una parada con seis
+  tarimas faltantes ([docs/03 §14.5](docs/03-state-machines-and-rules.md)).
+- Las cantidades y capacidades viajan como **cadena decimal**, igual que el
+  dinero. El gate compara peso contra capacidad, y esa comparación no puede
+  depender de cómo `JSON.parse` redondeó un double.
 
 Toda escritura exige `Idempotency-Key`; un reintento devuelve la respuesta
 original y responde `Idempotent-Replay: true`. `If-Match` lleva la revisión que
@@ -152,6 +234,7 @@ aparece en la respuesta, en la auditoría y en cada evento emitido.
 | [08 — IA empresarial](docs/08-enterprise-ai.md) | Copilotos, modelos, controles y niveles de autonomía |
 | [09 — Roadmap construible](docs/09-roadmap-and-acceptance.md) | Épicas, fases, gates y criterios de aceptación |
 | [12 — Fase 1: Solicitud a Orden](docs/12-phase-1-request-to-order.md) | Contrato implementable del primer corte vertical de Fase 1 |
+| [13 — Fase 2: Orden a Entrega](docs/13-phase-2-order-to-delivery.md) | Contrato implementable del corte de ejecución, con el gate de liberación |
 | [10 — Mapa de capacidades](docs/10-capability-map.md) | Cobertura completa de todas las áreas del negocio |
 | [11 — Arquitectura técnica](docs/11-technical-reference-architecture.md) | Stack de referencia, escala, almacenamiento y despliegue |
 

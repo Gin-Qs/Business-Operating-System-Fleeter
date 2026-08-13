@@ -30,6 +30,7 @@ DeliveryFailed,BC-03,DeliveryOutcome,BC-06;PS-03;PS-04;Data,Activar contingencia
 EvidenceSubmitted,BC-03,EvidenceSubmission,PS-02;PS-03;Data,Iniciar validación,restricted
 EvidenceAccepted,BC-03,EvidenceSubmission,BC-05;Customer portal;Data,Habilitar facturabilidad,restricted
 EvidenceRejected,BC-03,EvidenceSubmission,PS-03;PS-04;Data,Solicitar corrección,restricted
+EvidenceWaived,BC-03,EvidenceRequirement,BC-05;BC-06;PS-03;Data,Habilitar facturabilidad sin evidencia con aprobación y motivo,restricted
 TripExceptionRaised,BC-03,Trip,BC-06;Control tower;PS-03;Data,Crear señal accionable,confidential
 TripOperationallyClosed,BC-03,Trip,BC-05;Data,Iniciar cierre de costos,confidential
 ResourceEligibilityChanged,BC-04,Vehicle/Driver,BC-03;PS-03;Data,Permitir o bloquear asignación,restricted
