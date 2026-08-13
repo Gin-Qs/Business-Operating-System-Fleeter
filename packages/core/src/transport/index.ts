@@ -13,3 +13,5 @@
 export * from "./service-requests";
 export * from "./transport-orders";
 export * from "./trips";
+export * from "./stops";
+export * from "./evidence";
