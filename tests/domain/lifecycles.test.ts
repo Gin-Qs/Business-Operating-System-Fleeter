@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   countsInWinRate,
+  evidenceSubmissionLifecycle,
+  isStopResolved,
+  occupiesResources,
   quoteLifecycle,
   serviceRequestLifecycle,
+  stopExecutionLifecycle,
+  STOP_RESOLVED_STATES,
   transportOrderLifecycle,
+  tripLifecycle,
+  TRIP_PRE_RELEASE_STATES,
 } from "@fleeter/domain";
 
 /**
@@ -118,9 +125,91 @@ describe("ciclo de vida de la orden de transporte", () => {
     expect(transportOrderLifecycle.canTransition("Validated", "Committed")).toBe(true);
   });
 
-  it("cierra el corte en Committed", () => {
-    // docs/03 §3 continúa hacia Planned e InExecution, pero eso pertenece a la
-    // fase que implemente la planeación.
-    expect(transportOrderLifecycle.isTerminal("Committed")).toBe(true);
+  it("comprometer habilita planear, y no saltar a ejecución", () => {
+    // La Fase 1 dejaba `Committed` terminal porque la planeación no existía.
+    // Con Fase 2 continúa, pero el orden de docs/03 §3 se respeta: no se
+    // ejecuta lo que no se planeó.
+    expect(transportOrderLifecycle.canTransition("Committed", "Planned")).toBe(true);
+    expect(transportOrderLifecycle.canTransition("Committed", "InExecution")).toBe(false);
+    expect(transportOrderLifecycle.canTransition("Planned", "InExecution")).toBe(true);
+  });
+
+  it("una orden en ejecución ya no se cancela", () => {
+    // Cancelar con carga en la calle no es una transición de estado: es una
+    // operación que hay que abortar y explicar.
+    expect(transportOrderLifecycle.canTransition("InExecution", "Cancelled")).toBe(false);
+    expect(transportOrderLifecycle.canTransition("Committed", "Cancelled")).toBe(true);
+    expect(transportOrderLifecycle.canTransition("Planned", "Cancelled")).toBe(true);
+  });
+
+  it("los desenlaces son terminales", () => {
+    // docs/03 §3 continúa hacia FinanciallyClosed, que es un resumen financiero
+    // de la fase que implemente facturación.
+    expect(transportOrderLifecycle.isTerminal("Fulfilled")).toBe(true);
+    expect(transportOrderLifecycle.isTerminal("PartiallyFulfilled")).toBe(true);
+    expect(transportOrderLifecycle.isTerminal("Cancelled")).toBe(true);
+  });
+});
+
+describe("ciclo de vida del viaje — docs/03 §4", () => {
+  it("no se libera sin confirmar la asignación", () => {
+    expect(tripLifecycle.canTransition("Assigned", "Released")).toBe(false);
+    expect(tripLifecycle.canTransition("Confirmed", "Released")).toBe(true);
+  });
+
+  it("reasignar es legítimo antes de liberar y no después", () => {
+    expect(tripLifecycle.canTransition("Confirmed", "Assigned")).toBe(true);
+    expect(tripLifecycle.canTransition("Released", "Assigned")).toBe(false);
+  });
+
+  it("cancelar solo antes de comprometer recursos; después se aborta", () => {
+    for (const state of TRIP_PRE_RELEASE_STATES) {
+      expect(tripLifecycle.canTransition(state, "Cancelled")).toBe(true);
+    }
+    expect(tripLifecycle.canTransition("InTransit", "Cancelled")).toBe(false);
+    expect(tripLifecycle.canTransition("InTransit", "Aborted")).toBe(true);
+  });
+
+  it("un viaje liberado ocupa recursos y uno planeado no", () => {
+    expect(occupiesResources("Planned")).toBe(false);
+    expect(occupiesResources("Released")).toBe(true);
+    expect(occupiesResources("InTransit")).toBe(true);
+    expect(occupiesResources("OperationallyClosed")).toBe(false);
+  });
+
+  it("no se cierra un viaje que no fue entregado", () => {
+    expect(tripLifecycle.canTransition("InTransit", "OperationallyClosed")).toBe(false);
+    expect(tripLifecycle.canTransition("Delivered", "OperationallyClosed")).toBe(true);
+  });
+});
+
+describe("ciclo de vida de la parada — docs/03 §5", () => {
+  it("no se sirve una parada a la que no se llegó", () => {
+    expect(stopExecutionLifecycle.canTransition("Pending", "Servicing")).toBe(false);
+    expect(stopExecutionLifecycle.canTransition("Arrived", "Servicing")).toBe(true);
+  });
+
+  it("omitir una parada se decide antes de llegar", () => {
+    expect(stopExecutionLifecycle.canTransition("Pending", "Skipped")).toBe(true);
+    expect(stopExecutionLifecycle.canTransition("Servicing", "Skipped")).toBe(false);
+  });
+
+  it("todo desenlace es terminal y cuenta como resuelto", () => {
+    for (const state of STOP_RESOLVED_STATES) {
+      expect(stopExecutionLifecycle.isTerminal(state)).toBe(true);
+      expect(isStopResolved(state)).toBe(true);
+    }
+    expect(isStopResolved("Servicing")).toBe(false);
+  });
+});
+
+describe("ciclo de vida de la evidencia — docs/03 §6", () => {
+  it("una aceptada no se reabre: corregir exige una presentación nueva", () => {
+    expect(evidenceSubmissionLifecycle.isTerminal("Accepted")).toBe(true);
+    expect(evidenceSubmissionLifecycle.canTransition("Accepted", "Validating")).toBe(false);
+  });
+
+  it("una rechazada tampoco se reabre; el reenvío es otra presentación", () => {
+    expect(evidenceSubmissionLifecycle.isTerminal("Rejected")).toBe(true);
   });
 });
