@@ -12,6 +12,7 @@
 
 export * from "./service-requests";
 export * from "./transport-orders";
+export * from "./planning";
 export * from "./trips";
 export * from "./stops";
 export * from "./evidence";

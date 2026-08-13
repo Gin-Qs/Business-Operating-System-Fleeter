@@ -442,11 +442,13 @@ export async function checkReleaseGate(
 
   const assignment = assignments[0] ?? null;
 
-  const [vehicle, trailer, driver] = await Promise.all([
-    resourceFacts(tx, "vehicle", assignment?.vehicleId ?? null),
-    resourceFacts(tx, "trailer", assignment?.trailerId ?? null),
-    resourceFacts(tx, "driver", assignment?.driverId ?? null),
-  ]);
+  // En serie y no con Promise.all: las tres consultas comparten la conexión de
+  // la transacción, y `pg` no admite dos en vuelo sobre el mismo cliente. Con
+  // Promise.all funciona por casualidad —se encolan— pero está deprecado y
+  // dejará de funcionar en pg@9.
+  const vehicle = await resourceFacts(tx, "vehicle", assignment?.vehicleId ?? null);
+  const trailer = await resourceFacts(tx, "trailer", assignment?.trailerId ?? null);
+  const driver = await resourceFacts(tx, "driver", assignment?.driverId ?? null);
 
   // Doble reserva: otros viajes del mismo operador que ya salieron y no han
   // cerrado. Sin datos de turno no se puede razonar sobre horarios (docs/13 §6),

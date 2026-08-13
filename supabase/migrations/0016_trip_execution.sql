@@ -37,6 +37,27 @@ alter type trn.transport_order_status add value if not exists 'fulfilled';
 alter type trn.transport_order_status add value if not exists 'partially_fulfilled';
 alter type trn.transport_order_status add value if not exists 'cancelled';
 
+-- La restricción que 0011 escribió decía `(status = 'committed') = (committed_at
+-- is not null)`, y era correcta mientras `committed` fuera el último estado. Al
+-- continuar el ciclo deja de serlo: una orden que avanza a `planned` conserva su
+-- fecha de compromiso y dejaría de cumplirla.
+--
+-- La regla que de verdad importa se mantiene y se dice mejor: una orden sin
+-- comprometer no tiene fecha de compromiso, y una comprometida —o cualquier
+-- estado posterior— la conserva. `cancelled` queda fuera de la comprobación
+-- porque se puede llegar a él desde ambos lados.
+alter table trn.transport_order
+  drop constraint if exists transport_order_committed_consistency;
+
+alter table trn.transport_order
+  add constraint transport_order_committed_consistency check (
+    case
+      when status in ('draft', 'validated') then committed_at is null
+      when status = 'cancelled' then true
+      else committed_at is not null
+    end
+  );
+
 -- ---------------------------------------------------------------------------
 -- Una excepción autoriza causas nombradas
 -- ---------------------------------------------------------------------------
