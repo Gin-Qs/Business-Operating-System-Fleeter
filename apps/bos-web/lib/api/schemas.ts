@@ -184,3 +184,177 @@ export const commitOrderSchema = z.object({
 /** Convierte una marca ISO opcional en Date, conservando null y undefined. */
 export const asDate = (value: string | null | undefined): Date | null =>
   value === null || value === undefined ? null : new Date(value);
+
+// ---------------------------------------------------------------------------
+// Capacidad — docs/13 §4
+// ---------------------------------------------------------------------------
+//
+// Las capacidades viajan como cadena decimal por la misma razón que el dinero:
+// el gate compara el peso de la carga contra la capacidad de la unidad, y esa
+// comparación no puede depender de cómo JSON.parse redondeó un double.
+
+export const registerVehicleSchema = z.object({
+  legal_entity_id: uuid,
+  code: z.string().min(1).max(64),
+  plate: z.string().min(1).max(32),
+  vehicle_type: z.string().min(1),
+  make: z.string().nullish(),
+  model: z.string().nullish(),
+  model_year: z.int().min(1950).max(2100).nullish(),
+  weight_capacity_kg: positiveDecimal(3).nullish(),
+  volume_capacity_m3: positiveDecimal(3).nullish(),
+  ownership: z.enum(["owned", "leased", "carrier"]).optional(),
+});
+
+export const registerTrailerSchema = z.object({
+  legal_entity_id: uuid,
+  code: z.string().min(1).max(64),
+  plate: z.string().nullish(),
+  equipment_type: z.string().min(1),
+  weight_capacity_kg: positiveDecimal(3).nullish(),
+  volume_capacity_m3: positiveDecimal(3).nullish(),
+  ownership: z.enum(["owned", "leased", "carrier"]).optional(),
+});
+
+export const registerDriverSchema = z.object({
+  legal_entity_id: uuid,
+  code: z.string().min(1).max(64),
+  full_name: z.string().min(1),
+  phone: z.string().nullish(),
+  user_account_id: uuid.nullish(),
+});
+
+export const recordCredentialSchema = z.object({
+  subject_type: z.enum(["vehicle", "trailer", "driver"]),
+  subject_id: uuid,
+  credential_type: z.string().min(1),
+  folio: z.string().nullish(),
+  issuer: z.string().nullish(),
+  issued_on: z.iso.date().nullish(),
+  expires_on: z.iso.date().nullish(),
+  is_mandatory: z.boolean().optional(),
+  document_url: z.string().nullish(),
+});
+
+export const blockResourceSchema = z.object({
+  reason: z.string().min(1, "Un bloqueo sin causa no se puede levantar"),
+  review_at: timestamp.nullish(),
+});
+
+export const releaseResourceSchema = z.object({
+  reason: z.string().nullish(),
+});
+
+// ---------------------------------------------------------------------------
+// Planeación y ejecución — docs/13 §10
+// ---------------------------------------------------------------------------
+
+export const createShipmentSchema = z.object({
+  reference: z.string().nullish(),
+  description: z.string().nullish(),
+  total_weight_kg: positiveDecimal(3).nullish(),
+  total_volume_m3: positiveDecimal(3).nullish(),
+  total_pieces: z.int().min(0).nullish(),
+  items: z
+    .array(
+      z.object({
+        line_number: z.int().min(1),
+        description: z.string().min(1),
+        uom: z.string().min(1),
+        quantity: positiveDecimal(),
+        weight_kg: positiveDecimal(3).nullish(),
+      }),
+    )
+    .min(1, "Una carga sin líneas no se puede entregar parcialmente ni contar"),
+});
+
+export const createStopsSchema = z.object({
+  stops: z
+    .array(
+      z.object({
+        kind: z.enum(["pickup", "delivery"]),
+        location_id: uuid,
+        sequence: z.int().min(1),
+        window_start: timestamp.nullish(),
+        window_end: timestamp.nullish(),
+        contact_name: z.string().nullish(),
+        contact_phone: z.string().nullish(),
+        instructions: z.string().nullish(),
+      }),
+    )
+    .min(2),
+});
+
+export const createRoutePlanSchema = z.object({
+  total_distance_km: positiveDecimal(3).nullish(),
+  estimated_duration_minutes: z.int().min(0).nullish(),
+  restrictions: z.record(z.string(), z.unknown()).optional(),
+  notes: z.string().nullish(),
+  stop_order: z
+    .array(z.object({ stop_id: uuid, sequence: z.int().min(1) }))
+    .optional(),
+});
+
+export const planTripSchema = z.object({
+  transport_order_id: uuid,
+  evidence_requirements: z.array(z.string().min(1)).optional(),
+});
+
+export const assignResourcesSchema = z.object({
+  vehicle_id: uuid.nullish(),
+  trailer_id: uuid.nullish(),
+  driver_id: uuid.nullish(),
+  notes: z.string().nullish(),
+});
+
+export const startTripSchema = z.object({
+  odometer_km: positiveDecimal(3).nullish(),
+});
+
+export const stopArrivalSchema = z.object({
+  latitude: decimal(6).nullish(),
+  longitude: decimal(6).nullish(),
+  notes: z.string().nullish(),
+});
+
+export const stopOutcomeSchema = z.object({
+  reason: z.string().nullish(),
+  signed_by: z.string().nullish(),
+  lines: z
+    .array(
+      z.object({
+        shipment_item_id: uuid,
+        uom: z.string().min(1),
+        planned: positiveDecimal(),
+        loaded: positiveDecimal(),
+        delivered: positiveDecimal(),
+        rejected: positiveDecimal(),
+        damaged: positiveDecimal(),
+        returned: positiveDecimal(),
+      }),
+    )
+    .min(1, "El desenlace se deriva de las cantidades: sin ellas saldría de la nada"),
+});
+
+export const closeTripSchema = z.object({
+  odometer_end_km: positiveDecimal(3).nullish(),
+});
+
+export const submitEvidenceSchema = z.object({
+  document_url: z.string().nullish(),
+  content_type: z.string().nullish(),
+  file_size_bytes: z.int().min(0).nullish(),
+  latitude: decimal(6).nullish(),
+  longitude: decimal(6).nullish(),
+  notes: z.string().nullish(),
+});
+
+export const acceptEvidenceSchema = z.object({ notes: z.string().nullish() });
+
+export const rejectEvidenceSchema = z.object({
+  reason: z.string().min(1, "Un rechazo sin motivo obliga a adivinar qué recapturar"),
+});
+
+export const waiveEvidenceSchema = z.object({
+  reason: z.string().min(1, "Dispensar una prueba de entrega exige explicación"),
+});
