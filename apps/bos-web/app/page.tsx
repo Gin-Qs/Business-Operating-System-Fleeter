@@ -1,11 +1,19 @@
 import { ArrowUpRight, ShieldCheck, Waveform } from "@phosphor-icons/react/dist/ssr";
 import { ActivationForm } from "./components/activation-form";
+import { DemoAccessButton } from "./components/demo-access-button";
 import { PortalMark } from "./components/portal-mark";
 import { SignInForm } from "./components/sign-in-form";
+import { isDemoEnabled } from "../lib/demo";
 
 const accessControls = ["Tenant y entidad legal", "Roles y permisos", "Auditoría por acción"];
 
+// El botón de demostración depende del entorno del servidor, así que la página
+// no se puede prerenderizar: un HTML estático lo dejaría encendido o apagado
+// para siempre según cómo estuviera el entorno al construir.
+export const dynamic = "force-dynamic";
+
 export default function AccessPortalPage() {
+  const demoEnabled = isDemoEnabled();
   return (
     <main className="min-h-[100dvh] bg-[#edf3f1] p-3 text-[#102521] sm:p-5 lg:p-6">
       <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] max-w-[1440px] overflow-hidden rounded-[2rem] border border-[#d4e0dc] bg-[#f8fbfa] shadow-[0_28px_70px_-38px_rgba(18,57,49,0.38)] lg:grid-cols-[minmax(0,1.04fr)_minmax(440px,0.96fr)] sm:min-h-[calc(100dvh-2.5rem)]">
@@ -91,6 +99,15 @@ export default function AccessPortalPage() {
             </p>
 
             <SignInForm />
+
+            {demoEnabled && (
+              <div className="mt-7 border-t border-[#dbe5e1] pt-6">
+                <p className="mb-3 text-xs font-semibold tracking-[0.13em] text-[#4a635c]">
+                  ¿SOLO QUIERES VER CÓMO FUNCIONA?
+                </p>
+                <DemoAccessButton />
+              </div>
+            )}
 
             <div className="mt-9 space-y-3 border-t border-[#dbe5e1] pt-5 text-xs leading-5 text-[#71847e]">
               <p>

@@ -89,6 +89,20 @@ valores están en tu `.env.local`:
 `PUBLISHER_DATABASE_URL` **no** va en Vercel: pertenece al worker, y darle a la
 web una credencial que no necesita solo amplía la superficie expuesta.
 
+Opcionalmente, el botón de demostración ([runbook 00
+§8](00-entornos-y-credenciales.md)):
+
+| Variable | Valor |
+|---|---|
+| `BOS_DEMO_ACCESS` | `true` |
+| `BOS_DEMO_EMAIL` | Correo de la cuenta demo |
+| `BOS_DEMO_PASSWORD` | Contraseña larga, propia de este despliegue |
+
+Pensarlo por entorno y no copiarlo de Production a Preview sin querer: en
+Preview es un escaparate, en Production es una cuenta de administrador con la
+contraseña publicada. `BOS_DEMO_PASSWORD` no lleva `NEXT_PUBLIC_`, así que
+Vercel no la incrusta en el bundle del navegador.
+
 > **Esto entrega a Vercel la credencial de la base.** Es inevitable para una app
 > desplegada, pero conviene saberlo: `bos_app` puede leer y escribir todo lo que
 > las políticas RLS permitan. No tiene `BYPASSRLS`, así que sigue confinado por
@@ -190,6 +204,10 @@ peticiones automatizadas.
 
 - **Rate limiting:** todavía no hay. El portal de acceso admite intentos
   ilimitados; Supabase Auth aplica los suyos, pero el BOS no añade ninguno.
+- **Acceso de demostración:** si `BOS_DEMO_ACCESS` quedó en `true`, cualquiera
+  con la URL entra como administrador del tenant `demo` con un clic. Esa cuenta
+  no alcanza otros tenants, pero decide si quieres esa puerta abierta antes de
+  publicar el enlace.
 - **Dominio propio:** una URL `*.vercel.app` sirve para revisar avances, no para
   operar. Al añadir uno, la protección SSO deja de aplicarle
   (`all_except_custom_domains`), así que ese dominio queda expuesto.

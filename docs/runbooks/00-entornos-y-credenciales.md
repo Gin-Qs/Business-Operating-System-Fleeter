@@ -208,7 +208,49 @@ Dos cosas que conviene saber antes:
   excepción no puede concederla. Activa al menos `pricing@` y `aprobador@` para
   poder recorrer `DEMO-REQ-002` entero.
 
-## 8. Worker de outbox
+## 8. Acceso de demostración
+
+Un botón en el portal que entra sin escribir nada, como administrador del tenant
+`demo`. Sirve para enseñar el sistema sin dar de alta a nadie.
+
+```bash
+BOS_DEMO_ACCESS="true"
+BOS_DEMO_EMAIL="demo@tudominio.com"
+BOS_DEMO_PASSWORD="<contraseña larga y propia de este despliegue>"
+```
+
+El primer clic crea la identidad en Supabase Auth, provisiona el tenant `demo`
+y concede `tenant_admin`. Los siguientes solo inician sesión. Todo es
+idempotente, así que no hay un orden que respetar ni un script que correr antes.
+
+**Qué es en realidad.** Una cuenta de administrador cuya contraseña conoce
+cualquiera que tenga la URL. En un despliegue público eso es una puerta abierta,
+y encenderla es una decisión, no un ajuste.
+
+Lo que acota el daño no son las tres variables sino la cuarta propiedad: esa
+cuenta administra el tenant `demo` **y ningún otro**. No tiene membresía en el
+tuyo, y row level security filtra por membresía — de modo que ser administrador
+ahí no la acerca ni una fila a tus datos reales. Si esa garantía te importa,
+está probada en `tests/integration/tenant-isolation.test.ts`, no solo afirmada
+aquí.
+
+Tres detalles operativos:
+
+- **Apagado por defecto y sin contraseña por defecto.** `BOS_DEMO_ACCESS` tiene
+  que ser exactamente `"true"`; con menos de 8 caracteres de contraseña el botón
+  no aparece. Una contraseña horneada en el repositorio sería igual de abierta
+  pero idéntica en todos los despliegues del mundo.
+- **La contraseña no lleva `NEXT_PUBLIC_`.** No viaja al navegador ni queda en
+  el HTML: el botón manda un formulario vacío y quien firma es el servidor.
+- **La confirmación de correo lo rompe.** Si el proyecto de Supabase la exige,
+  la identidad se crea pero no puede entrar. Desactívala en **Authentication →
+  Providers → Email** o confirma esa cuenta una vez.
+
+Para apagarlo: quita `BOS_DEMO_ACCESS` y redespliega. La cuenta y su tenant
+siguen existiendo, pero ya no hay botón. Para borrarlos, elimina la identidad en
+Supabase y el tenant `demo`.
+
+## 9. Worker de outbox
 
 Es un deployment unit aparte ([docs/11 §3](../11-technical-reference-architecture.md))
 porque su patrón de carga y su modo de falla difieren del servidor web: un
@@ -228,10 +270,11 @@ select event_id, event_type, attempts, last_error
 from plt.outbox where status = 'failed';
 ```
 
-## 9. Rotación de credenciales
+## 10. Rotación de credenciales
 
 | Qué | Cuándo | Cómo |
 |---|---|---|
 | Contraseñas de `bos_app` / `bos_publisher` | Ante sospecha o salida de personal con acceso | `alter role ... with password`, luego actualizar `.env.local` y los secretos de despliegue |
 | `Supabase Root 2021 CA` | Vence el 2031-04-26 | Reemplazar el bloque en `supabase-ca.ts`. `npm run check:connection` lo detecta como fallo de verificación, no como error silencioso |
 | Identidades de prueba | Nunca en producción | No deben existir fuera de dev y test |
+| `BOS_DEMO_PASSWORD` | Cada vez que alguien con la URL deje de necesitarla | **Dos pasos, y el orden importa**: cambiar la contraseña de esa identidad en Supabase (Authentication → Users) y actualizar la variable. Cambiar solo la variable no rota nada — deja el botón roto, porque la identidad conserva la contraseña vieja y quien la sabía sigue pudiendo entrar por el formulario |

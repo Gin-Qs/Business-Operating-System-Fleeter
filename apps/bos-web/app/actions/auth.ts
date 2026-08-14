@@ -21,6 +21,54 @@ export interface ActivationState {
 }
 
 /**
+ * Lo que ocurre DESPUÉS de que el proveedor de identidad dijo que sí.
+ *
+ * Vive aparte porque hay dos puertas —el formulario y el botón de demo— y una
+ * sola de estas rutinas. Si el acceso demo tuviera su propia copia, el día que
+ * se agregue un paso aquí quedaría una puerta sin él, que es exactamente cómo
+ * se abren los huecos de autorización.
+ *
+ * Devuelve un mensaje de error o null si el acceso quedó establecido.
+ */
+export async function completeSignIn(
+  userId: string,
+  email: string,
+): Promise<string | null> {
+  // Quien fue invitado todavía no tiene membresía, y sin esto vería el mismo
+  // "cuenta sin acceso" que alguien a quien nadie invitó. Es idempotente.
+  await redeemInvitations(userId, email);
+
+  const memberships = await listMemberships(userId);
+  if (memberships.length === 0) {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut();
+    return "Credenciales inválidas o cuenta sin acceso.";
+  }
+
+  // docs/00 §9: el acceso es una acción sensible y deja rastro con actor y
+  // correlación, igual que cualquier cambio de estado.
+  const membership = memberships[0]!;
+  await withTenantTransaction(
+    {
+      tenantId: membership.tenantId,
+      actorType: "user",
+      actorId: userId,
+      legalEntityId: membership.legalEntityId,
+      correlationId: randomUUID(),
+    },
+    (tx) =>
+      recordAudit(tx, {
+        action: "UserSignedIn",
+        entityType: "UserAccount",
+        entityId: userId,
+        after: { role_code: membership.roleCode, tenant_slug: membership.tenantSlug },
+      }),
+  );
+
+  return null;
+}
+
+/**
  * Inicio de sesión.
  *
  * El mensaje de error es deliberadamente el mismo para credenciales inválidas y
@@ -42,37 +90,8 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     return { error: "Credenciales inválidas o cuenta sin acceso." };
   }
 
-  // Antes de resolver el tenant: quien fue invitado todavía no tiene ninguna
-  // membresía, y sin esto vería el mismo "cuenta sin acceso" que alguien a
-  // quien nadie invitó. Es idempotente, así que correrlo en cada acceso solo
-  // cuesta una consulta.
-  await redeemInvitations(data.user.id, data.user.email ?? email);
-
-  const memberships = await listMemberships(data.user.id);
-  if (memberships.length === 0) {
-    await supabase.auth.signOut();
-    return { error: "Credenciales inválidas o cuenta sin acceso." };
-  }
-
-  // docs/00 §9: el acceso es una acción sensible y deja rastro con actor y
-  // correlación, igual que cualquier cambio de estado.
-  const membership = memberships[0]!;
-  await withTenantTransaction(
-    {
-      tenantId: membership.tenantId,
-      actorType: "user",
-      actorId: data.user.id,
-      legalEntityId: membership.legalEntityId,
-      correlationId: randomUUID(),
-    },
-    (tx) =>
-      recordAudit(tx, {
-        action: "UserSignedIn",
-        entityType: "UserAccount",
-        entityId: data.user.id,
-        after: { role_code: membership.roleCode, tenant_slug: membership.tenantSlug },
-      }),
-  );
+  const failure = await completeSignIn(data.user.id, data.user.email ?? email);
+  if (failure) return { error: failure };
 
   redirect("/workspace");
 }
