@@ -7,7 +7,7 @@ import {
   type ContractState,
 } from "@fleeter/domain";
 import { recordAudit, type Tx } from "@fleeter/platform";
-import { notFound } from "../shared/command";
+import { assertRevision, notFound } from "../shared/command";
 import { CONTRACT_DB, toContractState } from "../shared/states";
 
 /**
@@ -190,20 +190,53 @@ async function requireVersion(tx: Tx, versionId: string) {
   return { ...toRecord(row), createdBy: row.createdBy };
 }
 
+/**
+ * Estados a los que NO se llega por `advanceContract`.
+ *
+ * Cada uno arrastra obligaciones que esta función no puede cumplir: `Active`
+ * exige firma, vigencia, tarifas y un aprobador distinto del redactor;
+ * `Terminated` exige un motivo. La base los rechazaría igual —dos checks de
+ * 0020 lo garantizan—, pero lo haría con un error de restricción que no le dice
+ * a nadie qué comando usar en su lugar.
+ */
+const CONTRACT_DEDICATED_TRANSITIONS: Readonly<Record<string, string>> = {
+  Active: "activateContract",
+  Terminated: "terminateContract",
+};
+
 export async function advanceContract(
   tx: Tx,
   actor: Actor,
-  input: { versionId: string; to: ContractState; reason?: string | null },
+  input: {
+    versionId: string;
+    to: ContractState;
+    reason?: string | null;
+    expectedRevision?: number | null;
+  },
 ): Promise<ContractVersionRecord> {
   requirePermission(actor, "contract:write");
 
+  const dedicated = CONTRACT_DEDICATED_TRANSITIONS[input.to];
+  if (dedicated) {
+    throw new BosError(
+      "rule_violation",
+      "contract_transition_needs_own_command",
+      `Pasar a ${input.to} exige comprobaciones que este comando no hace: usar ${dedicated}.`,
+    );
+  }
+
   const current = await requireVersion(tx, input.versionId);
+  assertRevision("contract", current.revision, input.expectedRevision);
   contractLifecycle.assertTransition(current.status, input.to);
 
-  await tx.query(
+  // `returning` y no el registro que ya teníamos en memoria: la escritura sube
+  // la revisión, y devolver la anterior le daría al cliente un `If-Match` que su
+  // siguiente llamada rechazaría por conflicto.
+  const { rows } = await tx.query<VersionRow>(
     `update com.contract_version
         set status = $2::com.contract_status, revision = revision + 1
-      where id = $1`,
+      where id = $1
+      returning ${VERSION_COLUMNS}`,
     [input.versionId, CONTRACT_DB[input.to]],
   );
 
@@ -216,7 +249,7 @@ export async function advanceContract(
     after: { status: input.to },
   });
 
-  return { ...current, status: input.to };
+  return toRecord(rows[0] as VersionRow);
 }
 
 /**
@@ -239,11 +272,13 @@ export async function activateContract(
     signedByName: string;
     signedDocumentUrl?: string | null;
     effectiveFrom: string;
+    expectedRevision?: number | null;
   },
 ): Promise<ContractVersionRecord> {
   requirePermission(actor, "contract:activate");
 
   const current = await requireVersion(tx, input.versionId);
+  assertRevision("contract", current.revision, input.expectedRevision);
   contractLifecycle.assertTransition(current.status, "Active");
   requireDifferentApprover(actor, current.createdBy);
 
@@ -304,7 +339,7 @@ export async function activateContract(
 export async function terminateContract(
   tx: Tx,
   actor: Actor,
-  input: { versionId: string; reason: string },
+  input: { versionId: string; reason: string; expectedRevision?: number | null },
 ): Promise<ContractVersionRecord> {
   requirePermission(actor, "contract:terminate");
 
@@ -317,6 +352,7 @@ export async function terminateContract(
   }
 
   const current = await requireVersion(tx, input.versionId);
+  assertRevision("contract", current.revision, input.expectedRevision);
   contractLifecycle.assertTransition(current.status, "Terminated");
 
   const { rows } = await tx.query<VersionRow>(
@@ -340,6 +376,14 @@ export async function terminateContract(
   return toRecord(rows[0] as VersionRow);
 }
 
+/**
+ * Lista los contratos con dos versiones distintas y a propósito.
+ *
+ * La ACTIVA es la que rige hoy; la ÚLTIMA es la que alguien está redactando. Un
+ * listado que solo mostrara la activa haría invisible un contrato en borrador
+ * —fila con todo en blanco y sin explicación— y quien lo redactó no encontraría
+ * su propio trabajo.
+ */
 export async function listContracts(tx: Tx, actor: Actor, customerId?: string) {
   requirePermission(actor, "contract:read");
 
@@ -348,14 +392,44 @@ export async function listContracts(tx: Tx, actor: Actor, customerId?: string) {
             cu.legal_name as "customerName",
             v.id as "activeVersionId", v.version as "activeVersion",
             v.effective_from as "effectiveFrom", v.effective_to as "effectiveTo",
-            v.currency
+            v.currency,
+            l.id as "latestVersionId", l.version as "latestVersion",
+            l.status::text as "latestStatus"
        from com.contract c
        join com.customer cu on cu.id = c.customer_id
        left join com.contract_version v
               on v.contract_id = c.id and v.status = 'active'
+       left join lateral (
+         select cv.id, cv.version, cv.status
+           from com.contract_version cv
+          where cv.contract_id = c.id
+          order by cv.version desc
+          limit 1
+       ) l on true
       where ($1::uuid is null or c.customer_id = $1)
       order by c.code`,
     [customerId ?? null],
+  );
+
+  return rows;
+}
+
+/** Historial de términos de un contrato, del más reciente al primero. */
+export async function listContractVersions(tx: Tx, actor: Actor, contractId: string) {
+  requirePermission(actor, "contract:read");
+
+  const { rows } = await tx.query(
+    `select v.id, v.version, v.status::text as status, v.revision, v.currency,
+            v.effective_from as "effectiveFrom", v.effective_to as "effectiveTo",
+            v.signed_at as "signedAt", v.signed_by_name as "signedByName",
+            v.payment_terms_days as "paymentTermsDays",
+            v.terminated_at as "terminatedAt", v.termination_reason as "terminationReason",
+            (select count(*) from com.contract_rate r where r.contract_version_id = v.id)::int
+              as "rateCount"
+       from com.contract_version v
+      where v.contract_id = $1
+      order by v.version desc`,
+    [contractId],
   );
 
   return rows;
@@ -365,6 +439,16 @@ export async function getContractVersion(tx: Tx, actor: Actor, versionId: string
   requirePermission(actor, "contract:read");
 
   const version = await requireVersion(tx, versionId);
+
+  const { rows: header } = await tx.query(
+    `select c.code, c.name, c.customer_id as "customerId", cu.legal_name as "customerName",
+            c.legal_entity_id as "legalEntityId"
+       from com.contract c
+       join com.customer cu on cu.id = c.customer_id
+      where c.id = $1`,
+    [version.contractId],
+  );
+
   const { rows: rates } = await tx.query(
     `select charge_code as "chargeCode", description, origin_zone as "originZone",
             destination_zone as "destinationZone", service_type as "serviceType",
@@ -374,5 +458,5 @@ export async function getContractVersion(tx: Tx, actor: Actor, versionId: string
     [versionId],
   );
 
-  return { ...version, rates };
+  return { ...version, contract: header[0] ?? null, rates };
 }

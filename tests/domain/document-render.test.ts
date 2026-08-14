@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  bindingShapeErrors,
   placeholdersIn,
   renderDocument,
+  repeatedPlaceholders,
   undeclaredPlaceholders,
   type ResolvedValue,
   type TemplateField,
@@ -186,5 +188,83 @@ describe("detección de marcadores", () => {
       field({ placeholder: "b" }),
     ]);
     expect(undeclared).toEqual(["a", "c"]);
+  });
+
+  it("distingue el marcador escrito como bloque del escrito como dato", () => {
+    const repeated = repeatedPlaceholders("{{a}} {{#each lista}}{{col}}{{/each}}");
+    expect([...repeated]).toEqual(["lista"]);
+  });
+});
+
+/**
+ * La forma del dato contra la forma en que el cuerpo lo usa.
+ *
+ * Este bloque cubre una falla que llegó a producirse: el tarifario de un
+ * contrato escrito `{{tarifas}}` se imprimía vacío y el documento se reportaba
+ * como emitido. Un contrato firmado con el tarifario en blanco es peor que uno
+ * que no se pudo emitir.
+ */
+describe("bindingShapeErrors — la tabla no se imprime sola", () => {
+  const isList = (binding: string) => binding === "bind.tarifas";
+
+  it("señala una tabla escrita como dato suelto y dice cómo escribirla", () => {
+    const problems = bindingShapeErrors(
+      "<h2>Tarifario</h2>{{tarifas}}",
+      [field({ placeholder: "tarifas" })],
+      isList,
+    );
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.message).toContain("{{#each tarifas}}");
+  });
+
+  it("señala un dato suelto escrito como bloque", () => {
+    const problems = bindingShapeErrors(
+      "{{#each cliente}}{{x}}{{/each}}",
+      [field({ placeholder: "cliente" })],
+      isList,
+    );
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.placeholder).toBe("cliente");
+  });
+
+  it("no se queja cuando cada forma coincide", () => {
+    const problems = bindingShapeErrors(
+      "{{cliente}} {{#each tarifas}}{{charge_code}}{{/each}}",
+      [field({ placeholder: "cliente" }), field({ placeholder: "tarifas" })],
+      isList,
+    );
+
+    expect(problems).toEqual([]);
+  });
+
+  it("el render bloquea aunque la plantilla se haya publicado antes de la regla", () => {
+    // Segunda barrera: la comprobación de publicación es nueva, y hay que
+    // suponer que existen plantillas publicadas sin ella.
+    const result = renderDocument({
+      body: "<h2>Tarifario</h2>{{tarifas}}",
+      fields: [field({ placeholder: "tarifas" })],
+      resolved: {
+        "bind.tarifas": { present: true, rows: [{ charge_code: "FLETE" }] },
+      },
+    });
+
+    expect(result.status).toBe("blocked");
+    if (result.status !== "blocked") return;
+    expect(result.missingFields[0]?.placeholder).toBe("tarifas");
+  });
+
+  it("bloquea la tabla mal escrita aunque el campo sea opcional", () => {
+    // Ser opcional autoriza a NO tener dato, no a tener uno que no se imprime.
+    const result = renderDocument({
+      body: "{{tarifas}}",
+      fields: [field({ placeholder: "tarifas", isMandatory: false })],
+      resolved: {
+        "bind.tarifas": { present: true, rows: [{ charge_code: "FLETE" }] },
+      },
+    });
+
+    expect(result.status).toBe("blocked");
   });
 });

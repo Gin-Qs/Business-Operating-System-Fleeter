@@ -16,6 +16,7 @@ import {
 } from "node:crypto";
 import { BosError } from "@fleeter/contracts";
 import {
+  bindingShapeErrors,
   renderDocument,
   undeclaredPlaceholders,
   type RenderResult,
@@ -208,9 +209,14 @@ export function proposeFieldsFromBody(body: string): TemplateFieldInput[] {
  * Publica una versión y retira la anterior.
  *
  * La validación fuerte —que todo campo tenga enlace y que el enlace exista— la
- * hace el trigger de 0019. Aquí solo se agrega la comprobación que el trigger no
- * puede hacer: que no queden marcadores en el cuerpo sin declarar, porque eso
- * dejaría un `{{algo}}` literal impreso en el documento del cliente.
+ * hace el trigger de 0019. Aquí se agregan las dos comprobaciones que el trigger
+ * no puede hacer porque miran el CUERPO y no la fila del campo:
+ *
+ *   1. Que no queden marcadores sin declarar, porque eso dejaría un `{{algo}}`
+ *      literal impreso en el documento del cliente.
+ *   2. Que la forma del dato coincida con la forma en que el cuerpo lo usa. Una
+ *      tabla escrita como `{{tarifas}}` imprimía vacío y el documento salía como
+ *      emitido: el tarifario en blanco de un contrato firmado.
  */
 export async function publishTemplate(tx: Tx, templateId: string): Promise<DocumentTemplate> {
   const template = await getTemplate(tx, templateId);
@@ -218,10 +224,9 @@ export async function publishTemplate(tx: Tx, templateId: string): Promise<Docum
     throw new BosError("not_found", "template_not_found", "La plantilla no existe.");
   }
 
-  const undeclared = undeclaredPlaceholders(
-    template.body,
-    template.fields as unknown as TemplateField[],
-  );
+  const fields = template.fields as unknown as TemplateField[];
+
+  const undeclared = undeclaredPlaceholders(template.body, fields);
   if (undeclared.length > 0) {
     throw new BosError(
       "rule_violation",
@@ -231,6 +236,30 @@ export async function publishTemplate(tx: Tx, templateId: string): Promise<Docum
       undeclared.map((placeholder) => ({
         rule: "template_placeholder_declared",
         message: `El marcador {{${placeholder}}} no tiene configuración.`,
+      })),
+    );
+  }
+
+  const { rows: repeatingRows } = await tx.query<{ path: string }>(
+    `select path from plt.document_binding where kind = $1 and is_repeating`,
+    [template.kind],
+  );
+  const repeatingBindings = new Set(repeatingRows.map((row) => row.path));
+
+  const shapeErrors = bindingShapeErrors(template.body, fields, (binding) =>
+    repeatingBindings.has(binding),
+  );
+  if (shapeErrors.length > 0) {
+    throw new BosError(
+      "rule_violation",
+      "template_binding_shape_mismatch",
+      `El formato usa un dato con una forma que no le corresponde: ${shapeErrors
+        .map((e) => e.placeholder)
+        .join(", ")}.`,
+      shapeErrors.map((error) => ({
+        rule: "template_binding_shape",
+        field: error.placeholder,
+        remediation: error.message,
       })),
     );
   }

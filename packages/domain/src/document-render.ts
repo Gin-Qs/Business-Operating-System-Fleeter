@@ -120,6 +120,58 @@ export const undeclaredPlaceholders = (
   return [...placeholdersIn(body)].filter((name) => !declared.has(name)).sort();
 };
 
+/** Marcadores que el cuerpo usa como bloque repetido, `{{#each nombre}}`. */
+export const repeatedPlaceholders = (body: string): ReadonlySet<string> =>
+  new Set([...body.matchAll(EACH_BLOCK)].map((m) => m[1] as string));
+
+/**
+ * Desajustes entre la FORMA del dato y la forma en que el cuerpo lo usa.
+ *
+ * Un enlace repetido —las tarifas de un contrato, los cargos de una cotización—
+ * es una tabla, no una cadena. Escrito como `{{tarifas}}` no hay nada sensato
+ * que imprimir, y lo que el motor hacía antes era imprimir vacío: el documento
+ * salía con el tarifario en blanco y el sistema lo reportaba como emitido.
+ *
+ * Es justo la falla que este subsistema existe para impedir, y no se arregla
+ * adivinando un formato de tabla —ese sería el motor inventando maquetación que
+ * el tenant no pidió— sino diciendo cómo se escribe.
+ */
+export const bindingShapeErrors = (
+  body: string,
+  fields: ReadonlyArray<TemplateField>,
+  isRepeating: (binding: string) => boolean,
+): ReadonlyArray<{ placeholder: string; binding: string; message: string }> => {
+  const repeated = repeatedPlaceholders(body);
+  const problems: Array<{ placeholder: string; binding: string; message: string }> = [];
+
+  for (const field of fields) {
+    const usedAsBlock = repeated.has(field.placeholder);
+    const isList = isRepeating(field.binding);
+
+    if (isList && !usedAsBlock) {
+      problems.push({
+        placeholder: field.placeholder,
+        binding: field.binding,
+        message:
+          `"${field.label}" son varias filas, no un dato suelto. En el formato se escribe ` +
+          `{{#each ${field.placeholder}}}…{{/each}} con las columnas dentro.`,
+      });
+    }
+
+    if (!isList && usedAsBlock) {
+      problems.push({
+        placeholder: field.placeholder,
+        binding: field.binding,
+        message:
+          `"${field.label}" es un solo dato: escrito como {{#each ${field.placeholder}}} no ` +
+          "repetiría nada. Se escribe {{" + field.placeholder + "}}.",
+      });
+    }
+  }
+
+  return problems;
+};
+
 /**
  * Produce el documento, o explica exactamente por qué no.
  *
@@ -129,11 +181,19 @@ export const undeclaredPlaceholders = (
  */
 export const renderDocument = (input: RenderInput): RenderResult => {
   const byPlaceholder = new Map(input.fields.map((f) => [f.placeholder, f]));
+  const repeated = repeatedPlaceholders(input.body);
 
   const missing = input.fields
     .filter((field) => {
       const value = input.resolved[field.binding];
       if (!value || !value.present) return field.isMandatory;
+
+      // Tabla escrita como dato suelto: no hay nada que imprimir sin inventar
+      // una maquetación. Bloquea en lugar de dejar el hueco, aunque la
+      // plantilla se haya publicado antes de que existiera la comprobación de
+      // `bindingShapeErrors`.
+      if ("rows" in value && !repeated.has(field.placeholder)) return true;
+
       // Un bloque repetido vacío cuenta como ausencia: una cotización sin
       // cargos no es una cotización con la tabla vacía.
       if ("rows" in value) return field.isMandatory && value.rows.length === 0;

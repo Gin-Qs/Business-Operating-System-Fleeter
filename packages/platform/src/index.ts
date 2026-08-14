@@ -11,6 +11,7 @@ export * from "./outbox/outbox";
 export * from "./outbox/publisher";
 export * from "./policy/policy-store";
 export * from "./provisioning/invitations";
+export * from "./provisioning/legal-entity";
 export * from "./provisioning/membership";
 export * from "./provisioning/provision-tenant";
 export * from "./session/actor";

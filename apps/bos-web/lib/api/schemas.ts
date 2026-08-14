@@ -186,6 +186,69 @@ export const asDate = (value: string | null | undefined): Date | null =>
   value === null || value === undefined ? null : new Date(value);
 
 // ---------------------------------------------------------------------------
+// Contrato — COM-007
+// ---------------------------------------------------------------------------
+
+export const createContractSchema = z.object({
+  legal_entity_id: uuid,
+  customer_id: uuid,
+  code: z.string().min(1).max(64),
+  name: z.string().min(1),
+  description: z.string().nullish(),
+});
+
+export const createContractVersionSchema = z.object({
+  currency,
+  effective_from: timestamp.nullish(),
+  effective_to: timestamp.nullish(),
+  payment_terms_days: z.int().min(0).nullish(),
+  sla: z.record(z.string(), z.unknown()).optional(),
+  evidence_rules: z.record(z.string(), z.unknown()).optional(),
+  billing_rules: z.record(z.string(), z.unknown()).optional(),
+  terms_text: z.string().nullish(),
+  rates: z
+    .array(
+      z.object({
+        charge_code: z.string().min(1).max(64),
+        description: z.string().nullish(),
+        origin_zone: z.string().nullish(),
+        destination_zone: z.string().nullish(),
+        service_type: z.string().nullish(),
+        equipment_type: z.string().nullish(),
+        uom: z.string().min(1),
+        unit_amount: positiveDecimal(),
+        minimum_amount: positiveDecimal().nullish(),
+        currency,
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * `Active` y `Terminated` no figuran aquí.
+ *
+ * No es una omisión: cada uno arrastra obligaciones —firma y tarifas el
+ * primero, motivo el segundo— y tiene su propio endpoint. El núcleo rechaza
+ * igualmente esas dos transiciones por este camino; el enum solo hace que el
+ * cliente se entere en el 400 y no después.
+ */
+export const advanceContractSchema = z.object({
+  to: z.enum(["Draft", "InReview", "PendingSignature", "Suspended", "Expiring", "Renewed", "Expired"]),
+  reason: z.string().min(1).nullish(),
+});
+
+export const activateContractSchema = z.object({
+  signed_at: timestamp,
+  signed_by_name: z.string().min(1, "Un contrato en vigor dice quién lo firmó"),
+  signed_document_url: z.string().nullish(),
+  effective_from: timestamp,
+});
+
+export const terminateContractSchema = z.object({
+  reason: z.string().min(1, "Terminar un contrato sin motivo deja sin explicación una relación que se acabó"),
+});
+
+// ---------------------------------------------------------------------------
 // Capacidad — docs/13 §4
 // ---------------------------------------------------------------------------
 //
