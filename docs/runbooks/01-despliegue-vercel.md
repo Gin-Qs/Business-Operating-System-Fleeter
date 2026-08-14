@@ -94,9 +94,13 @@ Opcionalmente, el botón de demostración ([runbook 00
 
 | Variable | Valor |
 |---|---|
-| `BOS_DEMO_ACCESS` | `true` |
-| `BOS_DEMO_EMAIL` | Correo de la cuenta demo |
-| `BOS_DEMO_PASSWORD` | Contraseña larga, propia de este despliegue |
+| `BOS_DEMO_PASSWORD` | Contraseña larga, propia de este despliegue. **Es la única que hace falta** |
+| `BOS_DEMO_EMAIL` | Opcional. Por defecto `demo@example.com` |
+
+**Si el botón no sale en el portal, es que `BOS_DEMO_PASSWORD` no está en ese
+entorno.** No hay otra causa, y no basta con guardarla: Vercel aplica variables
+nuevas al siguiente despliegue, así que hay que **redesplegar** (Deployments → …
+→ Redeploy) o empujar un commit.
 
 Pensarlo por entorno y no copiarlo de Production a Preview sin querer: en
 Preview es un escaparate, en Production es una cuenta de administrador con la
@@ -204,7 +208,7 @@ peticiones automatizadas.
 
 - **Rate limiting:** todavía no hay. El portal de acceso admite intentos
   ilimitados; Supabase Auth aplica los suyos, pero el BOS no añade ninguno.
-- **Acceso de demostración:** si `BOS_DEMO_ACCESS` quedó en `true`, cualquiera
+- **Acceso de demostración:** si `BOS_DEMO_PASSWORD` quedó puesta, cualquiera
   con la URL entra como administrador del tenant `demo` con un clic. Esa cuenta
   no alcanza otros tenants, pero decide si quieres esa puerta abierta antes de
   publicar el enlace.

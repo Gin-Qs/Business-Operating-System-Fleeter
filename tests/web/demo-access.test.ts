@@ -13,7 +13,7 @@ import { demoAccess, isDemoEnabled } from "../../apps/bos-web/lib/demo";
  * defecto no sería de esta función: sería un tenant expuesto.
  */
 
-const ENV_KEYS = ["BOS_DEMO_ACCESS", "BOS_DEMO_EMAIL", "BOS_DEMO_PASSWORD"] as const;
+const ENV_KEYS = ["BOS_DEMO_EMAIL", "BOS_DEMO_PASSWORD"] as const;
 
 const withEnv = <T>(values: Partial<Record<(typeof ENV_KEYS)[number], string>>, fn: () => T): T => {
   const previous = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -36,71 +36,49 @@ afterEach(() => {
   for (const key of ENV_KEYS) delete process.env[key];
 });
 
-describe("acceso demo — apagado salvo decisión explícita", () => {
+describe("acceso demo — la contraseña es el interruptor", () => {
   it("sin configuración no existe", () => {
     expect(withEnv({}, demoAccess)).toBeNull();
     expect(withEnv({}, isDemoEnabled)).toBe(false);
   });
 
-  it("no se enciende solo por tener correo y contraseña", () => {
-    // El interruptor es el interruptor. Dejar credenciales configuradas en un
-    // entorno no debería abrir la puerta por sí solo: se apaga quitando una
-    // variable, no tres.
-    const access = withEnv(
-      { BOS_DEMO_EMAIL: "demo@fleeter.mx", BOS_DEMO_PASSWORD: "unaClaveLarga" },
-      demoAccess,
-    );
+  it("un correo configurado no basta para abrir la puerta", () => {
+    // Lo que enciende el acceso es la contraseña, siempre. Dejar el correo
+    // puesto —al preparar el despliegue, al copiar variables entre entornos—
+    // no debería bastar.
+    const access = withEnv({ BOS_DEMO_EMAIL: "demo@fleeter.mx" }, demoAccess);
 
     expect(access).toBeNull();
   });
 
-  it("sin contraseña queda apagado aunque el interruptor esté en true", () => {
-    // Deliberadamente no hay contraseña por defecto. Una horneada en el
-    // repositorio sería la misma puerta abierta, pero idéntica en todos los
-    // despliegues del mundo.
-    const access = withEnv(
-      { BOS_DEMO_ACCESS: "true", BOS_DEMO_EMAIL: "demo@fleeter.mx" },
-      demoAccess,
-    );
-
-    expect(access).toBeNull();
+  it("no hay contraseña por defecto", () => {
+    // Una horneada en el repositorio sería la misma puerta abierta, pero
+    // idéntica en todos los despliegues del mundo. Sin variable no hay botón.
+    expect(withEnv({}, demoAccess)).toBeNull();
   });
 
   it("rechaza una contraseña demasiado corta en lugar de prometer un botón roto", () => {
-    const access = withEnv(
-      {
-        BOS_DEMO_ACCESS: "true",
-        BOS_DEMO_EMAIL: "demo@fleeter.mx",
-        BOS_DEMO_PASSWORD: "corta",
-      },
-      demoAccess,
-    );
-
-    expect(access).toBeNull();
-  });
-
-  it("solo un true literal enciende", () => {
-    for (const value of ["1", "yes", "TRUE", "on", ""]) {
-      const access = withEnv(
-        {
-          BOS_DEMO_ACCESS: value,
-          BOS_DEMO_EMAIL: "demo@fleeter.mx",
-          BOS_DEMO_PASSWORD: "unaClaveLarga",
-        },
-        demoAccess,
-      );
-
+    // Supabase rechazaría el alta y el botón fallaría en el clic. Vale más no
+    // mostrarlo que mostrar uno que no funciona.
+    for (const value of ["", "corta", "1234567"]) {
+      const access = withEnv({ BOS_DEMO_PASSWORD: value }, demoAccess);
       expect(access, `"${value}" no debería encender el acceso demo`).toBeNull();
     }
   });
 
-  it("con todo configurado devuelve la credencial y normaliza el correo", () => {
+  it("con solo la contraseña ya funciona, con un correo que no recibe nada", () => {
+    // Una variable y nada más: eso era el punto. El dominio por defecto es
+    // reservado por RFC 2606, así que la cuenta demo no puede recuperar su
+    // contraseña ni recibir correo, y no le pertenece a nadie.
+    const access = withEnv({ BOS_DEMO_PASSWORD: "unaClaveLarga" }, demoAccess);
+
+    expect(access).toEqual({ email: "demo@example.com", password: "unaClaveLarga" });
+    expect(withEnv({ BOS_DEMO_PASSWORD: "unaClaveLarga" }, isDemoEnabled)).toBe(true);
+  });
+
+  it("el correo se puede fijar y se normaliza", () => {
     const access = withEnv(
-      {
-        BOS_DEMO_ACCESS: "true",
-        BOS_DEMO_EMAIL: "  Demo@Fleeter.MX ",
-        BOS_DEMO_PASSWORD: "unaClaveLarga",
-      },
+      { BOS_DEMO_EMAIL: "  Demo@Fleeter.MX ", BOS_DEMO_PASSWORD: "unaClaveLarga" },
       demoAccess,
     );
 

@@ -213,11 +213,18 @@ Dos cosas que conviene saber antes:
 Un botón en el portal que entra sin escribir nada, como administrador del tenant
 `demo`. Sirve para enseñar el sistema sin dar de alta a nadie.
 
+Se enciende con **una sola variable**:
+
 ```bash
-BOS_DEMO_ACCESS="true"
-BOS_DEMO_EMAIL="demo@tudominio.com"
 BOS_DEMO_PASSWORD="<contraseña larga y propia de este despliegue>"
 ```
+
+Opcionalmente `BOS_DEMO_EMAIL`. Por defecto es `demo@example.com`, un dominio
+reservado por RFC 2606 que nunca entrega correo — lo cual es lo que se quiere:
+la cuenta demo no debería poder recuperar su propia contraseña.
+
+**Si el botón no aparece, es que esta variable no está puesta.** Es la única
+causa posible: no hay ninguna otra condición.
 
 El primer clic crea la identidad en Supabase Auth, provisiona el tenant `demo`
 y concede `tenant_admin`. Los siguientes solo inician sesión. Todo es
@@ -227,26 +234,24 @@ idempotente, así que no hay un orden que respetar ni un script que correr antes
 cualquiera que tenga la URL. En un despliegue público eso es una puerta abierta,
 y encenderla es una decisión, no un ajuste.
 
-Lo que acota el daño no son las tres variables sino la cuarta propiedad: esa
-cuenta administra el tenant `demo` **y ningún otro**. No tiene membresía en el
-tuyo, y row level security filtra por membresía — de modo que ser administrador
-ahí no la acerca ni una fila a tus datos reales. Si esa garantía te importa,
-está probada en `tests/integration/tenant-isolation.test.ts`, no solo afirmada
-aquí.
+Lo que acota el daño no es la variable sino una propiedad del diseño: esa cuenta
+administra el tenant `demo` **y ningún otro**. No tiene membresía en el tuyo, y
+row level security filtra por membresía — de modo que ser administrador ahí no
+la acerca ni una fila a tus datos reales. Si esa garantía te importa, está
+probada en `tests/integration/tenant-isolation.test.ts`, no solo afirmada aquí.
 
 Tres detalles operativos:
 
-- **Apagado por defecto y sin contraseña por defecto.** `BOS_DEMO_ACCESS` tiene
-  que ser exactamente `"true"`; con menos de 8 caracteres de contraseña el botón
-  no aparece. Una contraseña horneada en el repositorio sería igual de abierta
-  pero idéntica en todos los despliegues del mundo.
+- **Sin contraseña por defecto.** Con menos de 8 caracteres el botón no aparece.
+  Una horneada en el repositorio sería igual de abierta pero idéntica en todos
+  los despliegues del mundo.
 - **La contraseña no lleva `NEXT_PUBLIC_`.** No viaja al navegador ni queda en
   el HTML: el botón manda un formulario vacío y quien firma es el servidor.
 - **La confirmación de correo lo rompe.** Si el proyecto de Supabase la exige,
   la identidad se crea pero no puede entrar. Desactívala en **Authentication →
   Providers → Email** o confirma esa cuenta una vez.
 
-Para apagarlo: quita `BOS_DEMO_ACCESS` y redespliega. La cuenta y su tenant
+Para apagarlo: quita `BOS_DEMO_PASSWORD` y redespliega. La cuenta y su tenant
 siguen existiendo, pero ya no hay botón. Para borrarlos, elimina la identidad en
 Supabase y el tenant `demo`.
 
