@@ -88,6 +88,13 @@ export default async function ConfigurationPage() {
             Nada se edita en sitio: publicar crea una versión nueva y cierra la anterior, que
             queda consultable con su autor, su motivo y su vigencia.
           </p>
+          <p className="mt-3 text-sm text-[#60786f]">
+            Los formatos de contrato y cotización se configuran en{" "}
+            <Link className="font-semibold text-[#226b5d]" href="/workspace/formatos">
+              Formatos
+            </Link>
+            .
+          </p>
         </header>
 
         {POLICY_CODES.map((code) => {
