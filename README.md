@@ -49,7 +49,10 @@ que autoriza.
 | Carga, paradas, plan de ruta versionado y viaje | Operativo |
 | Gate de liberación con causas y excepción por causa | Operativo |
 | Ejecución de paradas, entrega derivada y evidencia | Operativo |
-| Pantallas de flota y viajes | Fase 2, pendiente |
+| Pantallas de viajes con el gate visible | Operativo |
+| Contrato, versión contractual y tarifario inmutable | Operativo |
+| Pantalla de Formatos: subir, enlazar, publicar y emitir | Operativo |
+| Pantallas de flota y captura de carga, paradas y plan | Solo API |
 | Cargos, factura, pago y margen final | Fase 3 |
 
 ## Estructura
@@ -146,13 +149,30 @@ las tres viven en la base y en el dominio, no en la pantalla:
    que falta. No imprime hueco ni rellena por su cuenta. El texto para las
    ausencias legítimas lo escribe el tenant, y entonces es suyo.
 
+Hay una cuarta regla, que llegó después de que una prueba la reclamara: **la
+forma del dato tiene que coincidir con la forma en que el formato lo usa**. Un
+tarifario son varias filas; escrito `{{tarifas}}` en lugar de
+`{{#each tarifas}}…{{/each}}` el motor no tenía qué pegar, imprimía vacío y
+reportaba el documento como emitido — un contrato firmado con el tarifario en
+blanco. No se arregla adivinando una maquetación de tabla, sino deteniendo la
+publicación y diciendo exactamente cómo se escribe.
+
 El motor es sustitución pura: no hay modelo de lenguaje en el camino. Un
 documento que se firma no se redacta por inferencia.
 
-Hoy se pueden emitir **cotización** y **orden de transporte**. El contrato
-todavía no: la entidad `ContractVersion` (COM-007) no existe, y ofrecer enlaces
-de contrato sin contratos sería la misma promesa vacía que este subsistema
-impide hacer a los demás.
+Hoy se pueden emitir **cotización**, **orden de transporte** y **contrato**.
+
+Todo esto se configura en **Espacio de trabajo → Formatos**, sin escribir
+código: se sube el archivo, se ven los marcadores que detectó —todos vacíos—, se
+elige de dónde sale cada uno del catálogo publicado, se marca cuáles son
+obligatorios, se publica y se emite contra un registro real para ver qué sale.
+La pantalla no sugiere enlaces: `{{cliente}}` es la razón social casi siempre, y
+ese "casi" es justo el motivo — el día que no lo fuera, saldría impreso y
+firmado sin que nadie lo revisara.
+
+Se aceptan `.html`, `.md` y `.txt`. **`.docx` y `.pdf` todavía no**: habría que
+convertirlos, y una conversión que se equivoca no rompe el formato — cambia el
+texto de un contrato sin que nadie lo note.
 
 ## API
 
@@ -184,6 +204,13 @@ POST   /v1/quotes/{id}/decision
 
 POST   /v1/transport-orders                           GET /v1/transport-orders/{id}
 
+POST   /v1/contracts                                  GET /v1/contracts?customer_id=
+POST   /v1/contracts/{id}/versions                    GET /v1/contracts/{id}/versions
+GET    /v1/contract-versions/{id}
+POST   /v1/contract-versions/{id}/advance
+POST   /v1/contract-versions/{id}/activate
+POST   /v1/contract-versions/{id}/terminate
+
 POST   /v1/vehicles     /v1/trailers    /v1/drivers    /v1/credentials
 POST   /v1/vehicles/{id}/block                        POST /v1/vehicles/{id}/release
 
@@ -202,7 +229,11 @@ POST   /v1/evidence-requirements/{id}/submit          POST /v1/evidence-requirem
 POST   /v1/evidence-submissions/{id}/accept           POST /v1/evidence-submissions/{id}/reject
 ```
 
-Tres respuestas que sorprenden y son deliberadas:
+Cuatro respuestas que sorprenden y son deliberadas:
+
+- `POST /v1/contract-versions/{id}/advance` **rechaza** `Active` y `Terminated`.
+  Cada uno arrastra obligaciones que esa transición genérica no comprueba —firma,
+  vigencia y tarifas el primero; motivo el segundo— y cada uno tiene su endpoint.
 
 - `POST /v1/trips/{id}/release` devuelve **200 con `released: false`** y la lista
   de causas cuando el gate no pasa. La petición fue válida; lo que falta es un
