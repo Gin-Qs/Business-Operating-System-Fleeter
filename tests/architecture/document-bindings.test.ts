@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   RESOLVABLE_KINDS,
+  resolveContractBindings,
   resolveOrderBindings,
   resolveQuoteBindings,
   type BindingMap,
@@ -26,22 +27,29 @@ import type { Tx } from "@fleeter/platform";
  * enumerarlas, y así la prueba corre siempre y no solo cuando hay PostgreSQL.
  */
 
-const MIGRATION = resolve(
-  import.meta.dirname,
-  "../../supabase/migrations/0019_document_templates.sql",
-);
+const MIGRATIONS = resolve(import.meta.dirname, "../../supabase/migrations");
+
+/**
+ * Los enlaces se siembran en la migración que crea cada entidad, no en una sola:
+ * los de contrato llegaron con `com.contract` porque antes no había qué
+ * resolver. Leer solo un archivo dejaría fuera todo lo que se agregue después.
+ */
+const allMigrations = (): string =>
+  readdirSync(MIGRATIONS)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()
+    .map((f) => readFileSync(resolve(MIGRATIONS, f), "utf8"))
+    .join("\n");
 
 /**
  * Solo los `insert into plt.document_binding`. La migración también siembra
  * `plt.catalog_item` con filas que empiezan igual —('QUOTE', 'Cotización'…)— y
  * confundirlas haría que la prueba comparara etiquetas contra rutas.
  */
-const bindingStatements = (): string => {
-  const sql = readFileSync(MIGRATION, "utf8");
-  return [...sql.matchAll(/insert into plt\.document_binding[\s\S]*?on conflict/g)]
+const bindingStatements = (): string =>
+  [...allMigrations().matchAll(/insert into plt\.document_binding[\s\S]*?on conflict/g)]
     .map((m) => m[0])
     .join("\n");
-};
 
 /** Rutas que la migración siembra, por tipo de documento. */
 const seededPaths = (kind: string): string[] => {
@@ -82,6 +90,10 @@ describe("catálogo de enlaces y resolvedores dicen lo mismo", () => {
 
   it("TRANSPORT_ORDER: cada ruta ofrecida está implementada", async () => {
     expect(await resolverPaths(resolveOrderBindings)).toEqual(seededPaths("TRANSPORT_ORDER"));
+  });
+
+  it("CONTRACT: cada ruta ofrecida está implementada", async () => {
+    expect(await resolverPaths(resolveContractBindings)).toEqual(seededPaths("CONTRACT"));
   });
 
   it("los tipos declarados como resolubles son exactamente los sembrados", () => {

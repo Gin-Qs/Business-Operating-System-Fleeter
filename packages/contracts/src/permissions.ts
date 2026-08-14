@@ -50,6 +50,12 @@ export const PERMISSIONS = [
   "credit:override",
   "transport_order:read",
   "transport_order:commit",
+  // Redactar, activar y terminar son tres facultades distintas: quien negocia
+  // un contrato no debería poder ponerlo en vigor sin que nadie más lo mire.
+  "contract:read",
+  "contract:write",
+  "contract:activate",
+  "contract:terminate",
 
   // Capacidad y ejecución — BC-04 / BC-03, alcance de docs/13
   "vehicle:read",

@@ -1,4 +1,5 @@
 import type {
+  ContractState,
   EvidenceSubmissionState,
   QuoteState,
   ServiceRequestState,
@@ -52,6 +53,18 @@ export const TRANSPORT_ORDER_DB: Readonly<Record<TransportOrderState, string>> =
   Cancelled: "cancelled",
 };
 
+export const CONTRACT_DB: Readonly<Record<ContractState, string>> = {
+  Draft: "draft",
+  InReview: "in_review",
+  PendingSignature: "pending_signature",
+  Active: "active",
+  Suspended: "suspended",
+  Expiring: "expiring",
+  Renewed: "renewed",
+  Expired: "expired",
+  Terminated: "terminated",
+};
+
 export const TRIP_DB: Readonly<Record<TripState, string>> = {
   Draft: "draft",
   Planned: "planned",
@@ -93,6 +106,7 @@ export const EVIDENCE_SUBMISSION_DB: Readonly<Record<EvidenceSubmissionState, st
 const SERVICE_REQUEST_DOMAIN = invert(SERVICE_REQUEST_DB);
 const QUOTE_DOMAIN = invert(QUOTE_DB);
 const TRANSPORT_ORDER_DOMAIN = invert(TRANSPORT_ORDER_DB);
+const CONTRACT_DOMAIN = invert(CONTRACT_DB);
 const TRIP_DOMAIN = invert(TRIP_DB);
 const STOP_EXECUTION_DOMAIN = invert(STOP_EXECUTION_DB);
 const EVIDENCE_SUBMISSION_DOMAIN = invert(EVIDENCE_SUBMISSION_DB);
@@ -102,6 +116,8 @@ export const toServiceRequestState = (value: string): ServiceRequestState =>
 export const toQuoteState = (value: string): QuoteState => QUOTE_DOMAIN[value] as QuoteState;
 export const toTransportOrderState = (value: string): TransportOrderState =>
   TRANSPORT_ORDER_DOMAIN[value] as TransportOrderState;
+export const toContractState = (value: string): ContractState =>
+  CONTRACT_DOMAIN[value] as ContractState;
 export const toTripState = (value: string): TripState => TRIP_DOMAIN[value] as TripState;
 export const toStopExecutionState = (value: string): StopExecutionState =>
   STOP_EXECUTION_DOMAIN[value] as StopExecutionState;

@@ -293,6 +293,108 @@ export async function resolveOrderBindings(
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// Contrato
+// ---------------------------------------------------------------------------
+//
+// El sujeto es una VERSIÓN contractual, no el contrato: un documento de
+// contrato se emite contra los términos que se firmaron, y esos viven en la
+// versión. Emitirlo contra el contrato obligaría a decidir cuál versión, y esa
+// decisión no le corresponde al motor de plantillas.
+
+const CONTRACT_SQL = `
+  select
+    t.name              as tenant_name,
+    t.default_locale    as tenant_locale,
+    t.default_timezone  as tenant_timezone,
+    le.legal_name       as entity_legal_name,
+    le.tax_id           as entity_tax_id,
+    le.country          as entity_country,
+    cu.legal_name       as customer_legal_name,
+    cu.tax_id           as customer_tax_id,
+    cu.code             as customer_code,
+    c.code              as contract_code,
+    c.name              as contract_name,
+    v.version, v.status, v.currency, v.payment_terms_days,
+    v.effective_from, v.effective_to, v.signed_at, v.signed_by_name, v.terms_text
+  from com.contract_version v
+  join com.contract c       on c.id  = v.contract_id
+  join org.tenant t         on t.id  = v.tenant_id
+  join org.legal_entity le  on le.id = c.legal_entity_id
+  join com.customer cu      on cu.id = c.customer_id
+  where v.id = $1
+`;
+
+const CONTRACT_RATES_SQL = `
+  select charge_code, coalesce(description, '') as description,
+         coalesce(origin_zone, '') as origin_zone,
+         coalesce(destination_zone, '') as destination_zone,
+         coalesce(service_type, '') as service_type,
+         coalesce(equipment_type, '') as equipment_type,
+         uom, unit_amount, minimum_amount, currency
+  from com.contract_rate
+  where contract_version_id = $1
+  order by charge_code
+`;
+
+export async function resolveContractBindings(
+  tx: Tx,
+  contractVersionId: string,
+  issuance: IssuanceContext,
+): Promise<BindingMap | null> {
+  const { rows: found } = await tx.query(CONTRACT_SQL, [contractVersionId]);
+  const c = found[0];
+  if (!c) return null;
+
+  const options: FormatOptions = {
+    locale: String(c.tenant_locale ?? "es-MX"),
+    timezone: String(c.tenant_timezone ?? "UTC"),
+  };
+
+  const { rows: rates } = await tx.query(CONTRACT_RATES_SQL, [contractVersionId]);
+
+  return {
+    ...issuanceBindings(issuance, options),
+
+    "tenant.name": text(c.tenant_name),
+    "legal_entity.legal_name": text(c.entity_legal_name),
+    "legal_entity.tax_id": text(c.entity_tax_id),
+    "legal_entity.country": text(c.entity_country),
+
+    "customer.legal_name": text(c.customer_legal_name),
+    "customer.tax_id": text(c.customer_tax_id),
+    "customer.code": text(c.customer_code),
+
+    "contract.code": text(c.contract_code),
+    "contract.name": text(c.contract_name),
+    "contract.version": text(c.version),
+    "contract.status": text(c.status),
+    "contract.currency": text(c.currency),
+    "contract.payment_terms_days": text(c.payment_terms_days),
+    "contract.effective_from": datetime(c.effective_from, options),
+    "contract.effective_to": datetime(c.effective_to, options),
+    "contract.signed_at": datetime(c.signed_at, options),
+    "contract.signed_by_name": text(c.signed_by_name),
+    "contract.terms_text": text(c.terms_text),
+
+    "contract.rates": rows(
+      rates.map((r) => ({
+        charge_code: String(r.charge_code),
+        description: String(r.description),
+        origin_zone: String(r.origin_zone),
+        destination_zone: String(r.destination_zone),
+        service_type: String(r.service_type),
+        equipment_type: String(r.equipment_type),
+        uom: String(r.uom),
+        unit_amount: moneyText(r.unit_amount, options),
+        minimum_amount: r.minimum_amount === null ? "" : moneyText(r.minimum_amount, options),
+        currency: String(r.currency),
+      })),
+    ),
+  };
+}
+
 /** Los bloques repetidos necesitan celdas ya en texto, no `ResolvedValue`. */
 const moneyText = (value: unknown, options: FormatOptions): string => {
   const resolved = money(value, options);
@@ -305,7 +407,7 @@ const decimalText = (value: unknown, options: FormatOptions): string => {
 };
 
 /** Tipos de documento con resolvedor implementado. */
-export const RESOLVABLE_KINDS = ["QUOTE", "TRANSPORT_ORDER"] as const;
+export const RESOLVABLE_KINDS = ["QUOTE", "TRANSPORT_ORDER", "CONTRACT"] as const;
 export type ResolvableKind = (typeof RESOLVABLE_KINDS)[number];
 
 export const isResolvableKind = (kind: string): kind is ResolvableKind =>
@@ -322,6 +424,8 @@ export async function resolveBindings(
       return resolveQuoteBindings(tx, subjectId, issuance);
     case "TRANSPORT_ORDER":
       return resolveOrderBindings(tx, subjectId, issuance);
+    case "CONTRACT":
+      return resolveContractBindings(tx, subjectId, issuance);
     default:
       return null;
   }

@@ -265,3 +265,48 @@ export const evidenceSubmissionLifecycle = new StateMachine<EvidenceSubmissionSt
   },
   terminal: ["Accepted", "Rejected"],
 });
+
+/**
+ * Ciclo de vida del contrato — docs/03 §7.
+ *
+ * `Active` exige versión firmada y vigencia, y eso lo comprueban a la vez un
+ * check de la base y el dominio: la base ve la fila, el dominio puede contar las
+ * tarifas. Ninguno de los dos basta solo.
+ *
+ * `Suspended → Active` existe porque una suspensión es reversible —un cliente
+ * que se pone al corriente— mientras que `Terminated` no lo es. Colapsarlos
+ * obligaría a crear un contrato nuevo cada vez que alguien se atrasa un mes.
+ */
+export type ContractState =
+  | "Draft"
+  | "InReview"
+  | "PendingSignature"
+  | "Active"
+  | "Suspended"
+  | "Expiring"
+  | "Renewed"
+  | "Expired"
+  | "Terminated";
+
+export const contractLifecycle = new StateMachine<ContractState>({
+  name: "Contract",
+  initial: "Draft",
+  transitions: {
+    Draft: ["InReview", "Terminated"],
+    InReview: ["PendingSignature", "Draft", "Terminated"],
+    PendingSignature: ["Active", "InReview", "Terminated"],
+    Active: ["Suspended", "Expiring", "Terminated"],
+    Suspended: ["Active", "Terminated"],
+    Expiring: ["Renewed", "Expired", "Terminated"],
+    Renewed: [],
+    Expired: [],
+    Terminated: [],
+  },
+  terminal: ["Renewed", "Expired", "Terminated"],
+});
+
+/** Estados en que el contrato rige lo que se pacta con el cliente. */
+export const CONTRACT_BINDING_STATES: readonly ContractState[] = ["Active", "Expiring"];
+
+export const isContractBinding = (state: ContractState): boolean =>
+  CONTRACT_BINDING_STATES.includes(state);
