@@ -78,6 +78,25 @@ supabase db push
 ```
 
 Se aplican **antes** que el código que las necesita ([docs/11 §10](../11-technical-reference-architecture.md)).
+Nada automatiza este paso contra un proyecto real: desplegar código que espera
+una tabla que todavía no existe produce exactamente el error que se ve cuando se
+olvida (`relation "..." does not exist`).
+
+### Correr las pruebas sin Supabase
+
+Las pruebas de integración no necesitan el proyecto real. Contra cualquier
+PostgreSQL con TLS:
+
+```bash
+bash scripts/setup-local-db.sh "postgresql://postgres@127.0.0.1:5433/bos_test?sslmode=require"
+```
+
+Aplica el sustituto de `auth`, todas las migraciones y las identidades de
+prueba. Es lo mismo que hace CI, que levanta un PostgreSQL efímero por
+ejecución: así una rama que añade una migración se valida sola, sin que nadie
+tenga que aplicarla antes en una base compartida.
+
+El script se niega a correr contra un host de Supabase.
 
 ## 6. Alta del primer tenant
 
@@ -100,13 +119,138 @@ entidad ni evento.
 
 3. Iniciar sesión en `http://localhost:3000`.
 
+### El propietario todavía no puede operar
+
+Y no es un fallo. El provisionamiento concede `tenant_admin`, que configura el
+tenant pero **no crea clientes, no cotiza y no aprueba**:
+[docs/12 §3](../12-phase-1-request-to-order.md) separa gobierno de operación a
+propósito, y quien administra el sistema no debería poder además cerrar ventas
+en él sin que nadie lo haya decidido.
+
+El camino es **Espacio de trabajo → Equipo**, donde el propietario invita por
+correo con el rol que corresponda. Puede invitarse a sí mismo si opera solo: es
+una decisión legítima en una operación pequeña, queda auditada, y no debilita la
+regla que de verdad protege —nadie aprueba lo que él mismo solicitó
+([docs/03 §14.3](../03-state-machines-and-rules.md))—, porque esa mira a la
+persona y no al rol.
+
+La persona invitada entra al portal con ese mismo correo, usa **"Me invitaron y
+aún no tengo contraseña"** para crear su credencial, y al ingresar su acceso ya
+está activo.
+
+Fuera de la interfaz, el mismo alta se hace con:
+
+```bash
+npm run grant:role -- --tenant <uuid> --user-id <uuid> --email persona@empresa.mx --role commercial_executive
+```
+
+Ese camino exige conocer el UUID de una identidad ya existente, así que sirve
+para automatizar, no para el uso diario.
+
 ## 7. Datos de prueba
 
-`supabase/seed/test-fixtures.sql` crea tres identidades para las pruebas de
+`supabase/seed/test-fixtures.sql` crea cuatro identidades para las pruebas de
 integración. **Solo dev y test** — no es una migración a propósito. No pueden
 iniciar sesión: su `encrypted_password` está vacío.
 
-## 8. Worker de outbox
+### Tenant de demostración
+
+Para revisar el avance sin capturar nada a mano:
+
+```bash
+npm run seed:demo -- \
+  --tenant-slug demo-fleeter \
+  --owner-id <uuid de auth.users> \
+  --owner-email correo@empresa.com \
+  --domain empresa-de-pruebas.mx
+```
+
+Deja un tenant con clientes, ubicaciones, perfiles, límites de crédito y cinco
+solicitudes, una por cada estado que vale la pena mirar:
+
+| Referencia | En qué estado queda | Qué enseña |
+|---|---|---|
+| `DEMO-REQ-001` | Orden comprometida | El ciclo completo y su historia reconstruible |
+| `DEMO-REQ-002` | Cotización en aprobación | Un margen del 3.8% contra un umbral del 15%: exige excepción |
+| `DEMO-REQ-003` | `NeedsInformation` | Enviar sin origen no falla, se detiene y dice por qué |
+| `DEMO-REQ-004` | Cotización enviada | A la espera de la decisión del cliente |
+| `DEMO-REQ-005` | Aceptación bloqueada | Crédito en hold, con el rechazo auditado |
+
+Todo se crea con los mismos comandos que usa la aplicación, no con `insert`: las
+políticas se evaluaron de verdad, la auditoría existe y los eventos están en el
+outbox. Es idempotente.
+
+### Las cuentas
+
+El script **no crea identidades**: las contraseñas pertenecen al proveedor de
+identidad. Lo que crea son invitaciones, que es el camino real de alta. Una por
+rol del corte:
+
+```text
+comercial@<dominio>      commercial_executive
+pricing@<dominio>        pricing
+aprobador@<dominio>      commercial_approver
+credito@<dominio>        credit_officer
+operaciones@<dominio>    operations
+auditor@<dominio>        auditor
+```
+
+Cada persona entra al portal, pulsa **«Me invitaron y aún no tengo contraseña»**,
+pone ese correo y una contraseña nueva, y queda operativa con su rol.
+
+Dos cosas que conviene saber antes:
+
+- Con `--domain` inventado los correos de confirmación no llegan a ningún lado.
+  Si el proyecto de Supabase exige confirmar, usa un dominio cuyos buzones
+  puedas leer, o desactiva la confirmación en **Authentication → Providers →
+  Email** mientras dure la revisión.
+- Aprobar por debajo del umbral necesita **dos personas**: quien pide la
+  excepción no puede concederla. Activa al menos `pricing@` y `aprobador@` para
+  poder recorrer `DEMO-REQ-002` entero.
+
+## 8. Acceso de demostración
+
+Un botón en el portal que entra sin escribir nada, como administrador del tenant
+`demo`. Sirve para enseñar el sistema sin dar de alta a nadie.
+
+```bash
+BOS_DEMO_ACCESS="true"
+BOS_DEMO_EMAIL="demo@tudominio.com"
+BOS_DEMO_PASSWORD="<contraseña larga y propia de este despliegue>"
+```
+
+El primer clic crea la identidad en Supabase Auth, provisiona el tenant `demo`
+y concede `tenant_admin`. Los siguientes solo inician sesión. Todo es
+idempotente, así que no hay un orden que respetar ni un script que correr antes.
+
+**Qué es en realidad.** Una cuenta de administrador cuya contraseña conoce
+cualquiera que tenga la URL. En un despliegue público eso es una puerta abierta,
+y encenderla es una decisión, no un ajuste.
+
+Lo que acota el daño no son las tres variables sino la cuarta propiedad: esa
+cuenta administra el tenant `demo` **y ningún otro**. No tiene membresía en el
+tuyo, y row level security filtra por membresía — de modo que ser administrador
+ahí no la acerca ni una fila a tus datos reales. Si esa garantía te importa,
+está probada en `tests/integration/tenant-isolation.test.ts`, no solo afirmada
+aquí.
+
+Tres detalles operativos:
+
+- **Apagado por defecto y sin contraseña por defecto.** `BOS_DEMO_ACCESS` tiene
+  que ser exactamente `"true"`; con menos de 8 caracteres de contraseña el botón
+  no aparece. Una contraseña horneada en el repositorio sería igual de abierta
+  pero idéntica en todos los despliegues del mundo.
+- **La contraseña no lleva `NEXT_PUBLIC_`.** No viaja al navegador ni queda en
+  el HTML: el botón manda un formulario vacío y quien firma es el servidor.
+- **La confirmación de correo lo rompe.** Si el proyecto de Supabase la exige,
+  la identidad se crea pero no puede entrar. Desactívala en **Authentication →
+  Providers → Email** o confirma esa cuenta una vez.
+
+Para apagarlo: quita `BOS_DEMO_ACCESS` y redespliega. La cuenta y su tenant
+siguen existiendo, pero ya no hay botón. Para borrarlos, elimina la identidad en
+Supabase y el tenant `demo`.
+
+## 9. Worker de outbox
 
 Es un deployment unit aparte ([docs/11 §3](../11-technical-reference-architecture.md))
 porque su patrón de carga y su modo de falla difieren del servidor web: un
@@ -126,10 +270,11 @@ select event_id, event_type, attempts, last_error
 from plt.outbox where status = 'failed';
 ```
 
-## 9. Rotación de credenciales
+## 10. Rotación de credenciales
 
 | Qué | Cuándo | Cómo |
 |---|---|---|
 | Contraseñas de `bos_app` / `bos_publisher` | Ante sospecha o salida de personal con acceso | `alter role ... with password`, luego actualizar `.env.local` y los secretos de despliegue |
 | `Supabase Root 2021 CA` | Vence el 2031-04-26 | Reemplazar el bloque en `supabase-ca.ts`. `npm run check:connection` lo detecta como fallo de verificación, no como error silencioso |
 | Identidades de prueba | Nunca en producción | No deben existir fuera de dev y test |
+| `BOS_DEMO_PASSWORD` | Cada vez que alguien con la URL deje de necesitarla | **Dos pasos, y el orden importa**: cambiar la contraseña de esa identidad en Supabase (Authentication → Users) y actualizar la variable. Cambiar solo la variable no rota nada — deja el botón roto, porque la identidad conserva la contraseña vieja y quien la sabía sigue pudiendo entrar por el formulario |

@@ -28,6 +28,29 @@ export interface MarginDecision {
 }
 
 /**
+ * ¿El margen alcanza el umbral, sin pasar por punto flotante?
+ *
+ *     margin / revenue >= threshold   ⟺   margin · 10⁶ >= threshold_escalado · revenue
+ *
+ * La comparación se hace con enteros porque es la que decide si una cotización
+ * necesita aprobación. `Number("0.15")` no es 0.15 sino el double más cercano, y
+ * una cotización con exactamente 15% de margen caería del lado equivocado según
+ * de qué importes viniera —a veces sí, a veces no, sin que nadie pudiera
+ * explicar por qué. La política guarda el umbral como cadena decimal justo para
+ * evitar eso (docs/12 §8); redondearlo aquí anularía la precaución.
+ *
+ * Con ingreso negativo la desigualdad se invierte y la razón deja de significar
+ * lo que el umbral pretende medir: se trata como incumplimiento, que es lo
+ * conservador.
+ */
+const meetsThreshold = (margin: Money, revenue: Money, thresholdPct: string): boolean => {
+  if (revenue.minor <= 0n) return false;
+  // XXX es el código ISO 4217 de "sin moneda": el umbral es un escalar.
+  const scaledThreshold = Money.parse(thresholdPct, "XXX").minor;
+  return margin.minor * 1_000_000n >= scaledThreshold * revenue.minor;
+};
+
+/**
  * docs/12 §8:
  *
  *   contracted_margin     = quoted_revenue - quoted_cost
@@ -51,7 +74,7 @@ export function evaluateMinMargin(
       field: "quoted_revenue",
       remediation: "Cotizar al menos un cargo antes de solicitar aprobación",
     });
-  } else if (marginPct < thresholdPct) {
+  } else if (!meetsThreshold(margin, quotedRevenue, policy.threshold_pct)) {
     violations.push({
       rule: "MIN_MARGIN_NOT_MET",
       field: "quoted_revenue",

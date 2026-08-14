@@ -6,6 +6,7 @@ PolicyPublished,BC-01,Policy,All contexts;PS-03,Aplicar nueva política vigente,
 DecisionRecorded,BC-01/06,CorporateDecision,Data;Executive cockpit,Medir decisión y resultado,confidential
 OpportunityOpened,BC-02,Opportunity,Data;PS-03,Iniciar seguimiento comercial,confidential
 QuoteCosted,BC-02,QuoteVersion,PS-03;Data,Conservar costos y supuestos,confidential
+QuoteApprovalRequested,BC-02,QuoteVersion,PS-03;PS-04;Data,Someter una versión a decisión de política de margen,confidential
 QuoteApproved,BC-02,QuoteVersion,PS-04;Data,Habilitar envío de versión,confidential
 QuoteSent,BC-02,QuoteVersion,PS-04;Data,Medir turnaround,confidential
 QuoteChangesRequested,BC-02,QuoteVersion,PS-04;Data,Devolver a pricing sin contarlo como derrota comercial,confidential
@@ -14,6 +15,7 @@ QuoteRejected,BC-02,QuoteVersion,PS-04;Data,Cerrar la versión como perdida ante
 ContractActivated,BC-02,ContractVersion,BC-03;BC-05;PS-03;Data,Publicar reglas ejecutables,restricted
 CreditHoldPlaced,BC-02,CreditProfile,BC-03;PS-03;PS-04,Bloquear compromisos según política,restricted
 ServiceRequestSubmitted,BC-03,ServiceRequest,BC-02;PS-03;Data,Iniciar validación,confidential
+ServiceRequestInformationRequested,BC-03,ServiceRequest,BC-02;PS-04;Data,Detener la solicitud con su causa hasta que se complete,confidential
 ServiceRequestAccepted,BC-03,ServiceRequest,BC-03;Data,Habilitar orden,confidential
 TransportOrderCommitted,BC-03,TransportOrder,BC-04;BC-05;Data,Formalizar demanda,confidential
 TripPlanned,BC-03,Trip,BC-04;PS-03;Data,Evaluar asignación,confidential
@@ -28,6 +30,7 @@ DeliveryFailed,BC-03,DeliveryOutcome,BC-06;PS-03;PS-04;Data,Activar contingencia
 EvidenceSubmitted,BC-03,EvidenceSubmission,PS-02;PS-03;Data,Iniciar validación,restricted
 EvidenceAccepted,BC-03,EvidenceSubmission,BC-05;Customer portal;Data,Habilitar facturabilidad,restricted
 EvidenceRejected,BC-03,EvidenceSubmission,PS-03;PS-04;Data,Solicitar corrección,restricted
+EvidenceWaived,BC-03,EvidenceRequirement,BC-05;BC-06;PS-03;Data,Habilitar facturabilidad sin evidencia con aprobación y motivo,restricted
 TripExceptionRaised,BC-03,Trip,BC-06;Control tower;PS-03;Data,Crear señal accionable,confidential
 TripOperationallyClosed,BC-03,Trip,BC-05;Data,Iniciar cierre de costos,confidential
 ResourceEligibilityChanged,BC-04,Vehicle/Driver,BC-03;PS-03;Data,Permitir o bloquear asignación,restricted

@@ -11,7 +11,12 @@ config({
 
 const nextConfig: NextConfig = {
   // Los paquetes del monorepo se consumen como TypeScript sin paso de compilación.
-  transpilePackages: ["@fleeter/contracts", "@fleeter/domain", "@fleeter/platform"],
+  transpilePackages: [
+    "@fleeter/contracts",
+    "@fleeter/core",
+    "@fleeter/domain",
+    "@fleeter/platform",
+  ],
 
   // `pg` abre sockets y carga módulos nativos opcionales: se resuelve en tiempo
   // de ejecución en lugar de empaquetarse.

@@ -175,3 +175,92 @@ la historia de qué regla estuvo vigente en cada momento.
 
 Lo que sigue siendo decisión del negocio —no del código— es **qué valores**
 publicar. Los de arranque son un punto de partida, no una recomendación.
+
+## 12. Decisiones tomadas al implementar
+
+Este documento describe el contrato; al escribirlo en código aparecieron huecos
+que había que cerrar de alguna manera. Se registran aquí porque son
+interpretaciones, no consecuencias inevitables: alguien puede llegar y decidir
+otra cosa, pero debería saber qué se decidió y por qué.
+
+### 12.1 Basta una ventana completa
+
+§5 y [docs/03 §2](03-state-machines-and-rules.md) dicen "ventana", en singular,
+así que enviar exige **una** ventana con inicio y fin, de carga o de entrega.
+"Recoge cuando puedas, entrega antes del viernes" y "carga el martes a primera
+hora" son ambas solicitudes legítimas; exigir las dos rechazaría demanda real
+por un dato que el cliente no tiene. Causa: `time_window_required`.
+
+### 12.2 Enviar una solicitud incompleta no es un error
+
+§9.2 exige que quede en `NeedsInformation`, y §5 solo publica
+`Draft → Submitted` y `Submitted → NeedsInformation`. El comando recorre **las
+dos** transiciones en una transacción: no hay salto de estado
+([docs/03 §14.2](03-state-machines-and-rules.md)) y el desenlace es el que pide
+el criterio. La respuesta es 200 con `complete: false`, no 422: la petición fue
+válida, lo que falta es un dato.
+
+Se emite un solo evento, `ServiceRequestInformationRequested`. El hecho que un
+consumidor necesita es que llegó una solicitud incompleta; anunciarla además
+como `ServiceRequestSubmitted` haría que pricing empezara a costear algo sin
+origen.
+
+### 12.3 Concurrencia y versión de evento son contadores distintos
+
+`revision` sube en cada escritura y es lo que compara `If-Match`. `event_seq`
+sube solo al emitir y es el `aggregate_version` del envelope. Con un solo
+contador, corregir un borrador —que no emite nada— dejaría un hueco, y la
+detección de eventos perdidos de [docs/06 §3](06-events-and-integrations.md)
+consiste precisamente en buscar huecos.
+
+### 12.4 La política se reevalúa al aprobar
+
+La versión guarda contra qué política se costeó, pero el aprobador decide bajo
+la regla **vigente en el momento de decidir**. Ambas quedan en la auditoría, así
+que la diferencia —si la hubo— es explicable. Congelar la de costeo dejaría
+aprobar hoy bajo un umbral que el negocio ya retiró.
+
+### 12.5 El umbral se compara con enteros
+
+`Number("0.15")` no es 0.15 sino el double más cercano. Una cotización con
+exactamente 15% de margen caía de un lado o de otro según de qué importes
+viniera. La comparación se hace en unidades menores, igual que el resto de §8.
+
+### 12.6 Un rechazo se audita fuera de su transacción
+
+§9.1 y §9.5 exigen registrar el intento denegado y la regla aplicada. Un rechazo
+aborta la transacción, y con ella se iría su propio rastro, así que ese asiento
+—y solo ese— se escribe aparte. El tenant del asiento es el del **solicitante**:
+quien intenta alcanzar otro tenant deja el rastro en el suyo, donde su
+administrador puede verlo y sin filtrar nada hacia el tenant objetivo.
+
+### 12.7 Añadidos al contrato de §7
+
+- `PATCH /v1/service-requests/{id}` — sin él, la solicitud que §9.2 deja en
+  `NeedsInformation` no tendría cómo volver a estar completa.
+- `POST /v1/quotes/{id}/request-approval`, `/reject-approval` y `/decision` —
+  los comandos `RequestQuoteApproval`, `RejectQuoteApproval` y
+  `RecordQuoteRejection` de §6 no tenían ruta asignada.
+- `POST /v1/service-requests/{id}/cancel` y `/request-information`, por lo mismo.
+
+### 12.8 Dos permisos nuevos
+
+`credit:write` separa administrar un límite de eximir de él (`credit:override`).
+`quote:decide` separa enviar una propuesta de declarar que se ganó: eso último
+alimenta el win rate de `COM-001`, y venía implícito en `quote:send`.
+
+### 12.9 Las excepciones son un servicio de plataforma
+
+Una excepción de margen y una de crédito son el mismo mecanismo —alguien con
+facultad autoriza saltarse una política, por un motivo y con vigencia—, así que
+viven en `plt.exception_decision` (PS-03) y no una vez por contexto. No emiten
+evento propio: el catálogo de [docs/06 §4](06-events-and-integrations.md) no
+declara uno, y lo que el consumidor necesita saber es la aprobación que la
+excepción habilitó, que sí lo lleva en su payload.
+
+### 12.10 Sin crédito configurado no se compromete nada
+
+El valor de arranque de `CREDIT` deja el límite en cero, así que un cliente sin
+límite publicado no puede comprometer una orden. Un sistema que conceda crédito
+ilimitado mientras nadie lo configura es peor que uno que se detiene y dice qué
+falta.

@@ -84,7 +84,15 @@ export const QUOTE_CUSTOMER_DECISION_STATES: readonly QuoteState[] = ["Accepted"
 export const countsInWinRate = (state: QuoteState): boolean =>
   QUOTE_CUSTOMER_DECISION_STATES.includes(state);
 
-export type TransportOrderState = "Draft" | "Validated" | "Committed";
+export type TransportOrderState =
+  | "Draft"
+  | "Validated"
+  | "Committed"
+  | "Planned"
+  | "InExecution"
+  | "Fulfilled"
+  | "PartiallyFulfilled"
+  | "Cancelled";
 
 export const transportOrderLifecycle = new StateMachine<TransportOrderState>({
   name: "TransportOrder",
@@ -92,9 +100,213 @@ export const transportOrderLifecycle = new StateMachine<TransportOrderState>({
   transitions: {
     Draft: ["Validated"],
     Validated: ["Committed"],
-    // Committed cierra este corte. docs/03 §3 continúa hacia Planned,
-    // InExecution y Fulfilled cuando exista planeación (Fase 2).
-    Committed: [],
+    Committed: ["Planned", "Cancelled"],
+    Planned: ["InExecution", "Cancelled"],
+    InExecution: ["Fulfilled", "PartiallyFulfilled"],
+    // docs/03 §3 continúa hacia FinanciallyClosed, que es un resumen financiero
+    // de Fase 3. `OnHold` y `Failed` esperan el mecanismo de hold con dueño y
+    // fecha de revisión de docs/03 §14.6 a nivel de orden (docs/13 §5).
+    Fulfilled: [],
+    PartiallyFulfilled: [],
+    Cancelled: [],
   },
-  terminal: ["Committed"],
+  terminal: ["Fulfilled", "PartiallyFulfilled", "Cancelled"],
 });
+
+/**
+ * Ciclo de vida del viaje — docs/03 §4.
+ *
+ * La cadena publicada describe un movimiento de un origen a un destino. Con
+ * varias paradas se vuelve ambigua, y docs/13 §12.1 fija la lectura: el viaje
+ * avanza `AtOrigin`/`Loading` en su PRIMERA recolección y
+ * `AtDestination`/`Unloading` en su ÚLTIMA entrega; entre ellas permanece
+ * `InTransit` mientras cada parada recorre su propia máquina. No se inventan
+ * estados de viaje que docs/03 no publica.
+ *
+ * `OnHold` y `ReopenedOperationally` quedan fuera del corte: el primero exige
+ * el mecanismo de hold completo y el segundo una aprobación cuyo flujo todavía
+ * no existe.
+ */
+export type TripState =
+  | "Draft"
+  | "Planned"
+  | "Assigned"
+  | "Confirmed"
+  | "Released"
+  | "EnRouteToOrigin"
+  | "AtOrigin"
+  | "Loading"
+  | "InTransit"
+  | "AtDestination"
+  | "Unloading"
+  | "Delivered"
+  | "OperationallyClosed"
+  | "Cancelled"
+  | "Aborted";
+
+/** Antes de liberar todavía no hay recurso comprometido en la calle. */
+export const TRIP_PRE_RELEASE_STATES: readonly TripState[] = [
+  "Draft",
+  "Planned",
+  "Assigned",
+  "Confirmed",
+];
+
+export const tripLifecycle = new StateMachine<TripState>({
+  name: "Trip",
+  initial: "Draft",
+  transitions: {
+    Draft: ["Planned", "Cancelled"],
+    Planned: ["Assigned", "Cancelled"],
+    // Reasignar es legítimo mientras no se libere: vuelve a Assigned con una
+    // versión de asignación nueva, sin rehacer el plan.
+    Assigned: ["Confirmed", "Assigned", "Cancelled"],
+    Confirmed: ["Released", "Assigned", "Cancelled"],
+    Released: ["EnRouteToOrigin", "Aborted"],
+    EnRouteToOrigin: ["AtOrigin", "Aborted"],
+    AtOrigin: ["Loading", "Aborted"],
+    Loading: ["InTransit", "Aborted"],
+    InTransit: ["AtDestination", "Aborted"],
+    AtDestination: ["Unloading", "Aborted"],
+    Unloading: ["Delivered", "Aborted"],
+    Delivered: ["OperationallyClosed"],
+    OperationallyClosed: [],
+    Cancelled: [],
+    Aborted: [],
+  },
+  terminal: ["OperationallyClosed", "Cancelled", "Aborted"],
+});
+
+/** Estados en que el viaje ocupa recursos y cuenta como doble reserva. */
+export const TRIP_ACTIVE_STATES: readonly TripState[] = [
+  "Released",
+  "EnRouteToOrigin",
+  "AtOrigin",
+  "Loading",
+  "InTransit",
+  "AtDestination",
+  "Unloading",
+  "Delivered",
+];
+
+export const occupiesResources = (state: TripState): boolean =>
+  TRIP_ACTIVE_STATES.includes(state);
+
+/**
+ * Ciclo de vida de una parada — docs/03 §5.
+ *
+ * `Completed` NO significa POD aceptado. Son dos hechos, con dos dueños y dos
+ * tiempos: el operador cierra la parada en el andén, alguien valida la
+ * evidencia después.
+ */
+export type StopExecutionState =
+  | "Pending"
+  | "Approaching"
+  | "Arrived"
+  | "Servicing"
+  | "Completed"
+  | "PartiallyCompleted"
+  | "Rejected"
+  | "Failed"
+  | "Skipped";
+
+export const stopExecutionLifecycle = new StateMachine<StopExecutionState>({
+  name: "StopExecution",
+  initial: "Pending",
+  transitions: {
+    Pending: ["Approaching", "Arrived", "Skipped"],
+    Approaching: ["Arrived", "Skipped"],
+    Arrived: ["Servicing"],
+    Servicing: ["Completed", "PartiallyCompleted", "Rejected", "Failed"],
+    Completed: [],
+    PartiallyCompleted: [],
+    Rejected: [],
+    Failed: [],
+    Skipped: [],
+  },
+  terminal: ["Completed", "PartiallyCompleted", "Rejected", "Failed", "Skipped"],
+});
+
+/** Una parada resuelta ya no espera nada del operador. */
+export const STOP_RESOLVED_STATES: readonly StopExecutionState[] = [
+  "Completed",
+  "PartiallyCompleted",
+  "Rejected",
+  "Failed",
+  "Skipped",
+];
+
+export const isStopResolved = (state: StopExecutionState): boolean =>
+  STOP_RESOLVED_STATES.includes(state);
+
+/**
+ * Ciclo de vida de una presentación de evidencia — docs/03 §6.
+ *
+ * `Resubmitted` del documento no es un estado de esta máquina sino una
+ * presentación NUEVA: la rechazada permanece con su motivo y su validador, que
+ * es lo que permite explicar por qué hubo dos intentos.
+ */
+export type EvidenceSubmissionState =
+  | "Captured"
+  | "Submitted"
+  | "Validating"
+  | "Accepted"
+  | "Rejected";
+
+export const evidenceSubmissionLifecycle = new StateMachine<EvidenceSubmissionState>({
+  name: "EvidenceSubmission",
+  initial: "Captured",
+  transitions: {
+    Captured: ["Submitted"],
+    Submitted: ["Validating", "Accepted", "Rejected"],
+    Validating: ["Accepted", "Rejected"],
+    Accepted: [],
+    Rejected: [],
+  },
+  terminal: ["Accepted", "Rejected"],
+});
+
+/**
+ * Ciclo de vida del contrato — docs/03 §7.
+ *
+ * `Active` exige versión firmada y vigencia, y eso lo comprueban a la vez un
+ * check de la base y el dominio: la base ve la fila, el dominio puede contar las
+ * tarifas. Ninguno de los dos basta solo.
+ *
+ * `Suspended → Active` existe porque una suspensión es reversible —un cliente
+ * que se pone al corriente— mientras que `Terminated` no lo es. Colapsarlos
+ * obligaría a crear un contrato nuevo cada vez que alguien se atrasa un mes.
+ */
+export type ContractState =
+  | "Draft"
+  | "InReview"
+  | "PendingSignature"
+  | "Active"
+  | "Suspended"
+  | "Expiring"
+  | "Renewed"
+  | "Expired"
+  | "Terminated";
+
+export const contractLifecycle = new StateMachine<ContractState>({
+  name: "Contract",
+  initial: "Draft",
+  transitions: {
+    Draft: ["InReview", "Terminated"],
+    InReview: ["PendingSignature", "Draft", "Terminated"],
+    PendingSignature: ["Active", "InReview", "Terminated"],
+    Active: ["Suspended", "Expiring", "Terminated"],
+    Suspended: ["Active", "Terminated"],
+    Expiring: ["Renewed", "Expired", "Terminated"],
+    Renewed: [],
+    Expired: [],
+    Terminated: [],
+  },
+  terminal: ["Renewed", "Expired", "Terminated"],
+});
+
+/** Estados en que el contrato rige lo que se pacta con el cliente. */
+export const CONTRACT_BINDING_STATES: readonly ContractState[] = ["Active", "Expiring"];
+
+export const isContractBinding = (state: ContractState): boolean =>
+  CONTRACT_BINDING_STATES.includes(state);

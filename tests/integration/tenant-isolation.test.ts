@@ -128,12 +128,18 @@ describe.skipIf(!hasDatabase)("aislamiento entre tenants", () => {
   });
 
   it("el propietario recibe el rol de administrador con sus permisos", async () => {
-    const [membership] = await listMemberships(alpha.ownerUserId);
+    const memberships = await listMemberships(alpha.ownerUserId);
+    // Se busca por rol y no se toma la primera: una persona puede acumular
+    // membresías —el propio administrador puede concederse un rol operativo—, y
+    // dar por hecho que solo tiene una convertiría esta prueba en un detector de
+    // orden de ejecución en lugar de una comprobación de permisos.
+    const membership = memberships.find((m) => m.roleCode === "tenant_admin");
 
-    expect(membership?.roleCode).toBe("tenant_admin");
+    expect(membership).toBeDefined();
     expect(membership?.permissions).toContain("tenant:configure");
     expect(membership?.permissions).toContain("audit:read");
-    // El administrador del tenant no aprueba cotizaciones: eso es otro rol.
+    // El administrador del tenant no aprueba cotizaciones: eso es otro rol, y
+    // tenerlo exige una concesión explícita y auditada.
     expect(membership?.permissions).not.toContain("quote:approve");
   });
 });

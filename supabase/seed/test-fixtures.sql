@@ -23,5 +23,9 @@ insert into auth.users (
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{"fixture":true}'),
   ('00000000-0000-0000-0000-000000000000', '33333333-3333-4333-8333-333333333333',
    'authenticated', 'authenticated', 'alpha.auditor@fleeter.test', '',
+   now(), now(), now(), '{"provider":"email","providers":["email"]}', '{"fixture":true}'),
+  -- Sin membresía inicial: existe para probar el ciclo de invitación y alta.
+  ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-8444-444444444444',
+   'authenticated', 'authenticated', 'alpha.invitee@fleeter.test', '',
    now(), now(), now(), '{"provider":"email","providers":["email"]}', '{"fixture":true}')
 on conflict (id) do nothing;

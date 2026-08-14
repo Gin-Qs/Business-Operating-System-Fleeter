@@ -21,14 +21,60 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Sin secretos configurados, las pruebas de integración se saltan solas y
-      # solo corren las de dominio. Con DATABASE_URL corren las de aislamiento,
-      # que son el gate real de docs/09 §3.
-      - name: Pruebas
-        run: npm test
+      # Las pruebas de integración corren contra un PostgreSQL efímero al que
+      # este mismo job aplica las migraciones.
+      #
+      # Antes apuntaban a una base compartida cuyo esquema se actualizaba a mano,
+      # y eso tenía dos consecuencias malas: cualquier rama que añadiera una
+      # migración rompía CI hasta que una persona se acordara de aplicarla, y
+      # cada ejecución escribía tenants de prueba en una base real.
+      #
+      # El certificado es autofirmado pero la verificación sigue siendo estricta:
+      # el cliente lo exige contra esa raíz concreta, igual que en producción
+      # exige la de Supabase. Relajar la verificación aquí acabaría copiándose a
+      # donde sí importa.
+      - name: Levantar PostgreSQL con TLS
+        run: |
+          mkdir -p /tmp/pgcerts
+          openssl req -new -x509 -days 2 -nodes \
+            -out /tmp/pgcerts/server.crt -keyout /tmp/pgcerts/server.key \
+            -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1,DNS:localhost"
+          # El usuario del contenedor de postgres es el 999. El orden importa:
+          # PostgreSQL rechaza arrancar si la clave tiene permisos de grupo, y
+          # chown los reintroduciría después de un chmod.
+          sudo chown 999:999 /tmp/pgcerts/server.key /tmp/pgcerts/server.crt
+          sudo chmod 600 /tmp/pgcerts/server.key
+          sudo chmod 644 /tmp/pgcerts/server.crt
+
+          docker run -d --name bos-postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=bos_test \
+            -p 5433:5432 \
+            -v /tmp/pgcerts:/certs:ro \
+            postgres:16 \
+            -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key
+
+          for attempt in $(seq 1 30); do
+            if pg_isready -h 127.0.0.1 -p 5433 -U postgres >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          pg_isready -h 127.0.0.1 -p 5433 -U postgres
+
+      - name: Aplicar el esquema
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          PUBLISHER_DATABASE_URL: ${{ secrets.PUBLISHER_DATABASE_URL }}
+          PGPASSWORD: postgres
+        run: bash scripts/setup-local-db.sh "postgresql://postgres@127.0.0.1:5433/bos_test?sslmode=require"
+
+      - name: Pruebas
+        env:
+          DATABASE_URL: "postgresql://bos_app:localdev@127.0.0.1:5433/bos_test"
+          PUBLISHER_DATABASE_URL: "postgresql://bos_publisher:localdev@127.0.0.1:5433/bos_test"
+        run: |
+          DATABASE_CA_CERT="$(sudo cat /tmp/pgcerts/server.crt)" npm test
+
+      - name: Registro de PostgreSQL si algo falló
+        if: failure()
+        run: docker logs bos-postgres | tail -50
 
       - name: Build
         run: npm run build

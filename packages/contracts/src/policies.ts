@@ -74,6 +74,26 @@ export const creditPolicySchema = z.object({
 
 export type CreditPolicy = z.infer<typeof creditPolicySchema>;
 
+/**
+ * Gate de liberación — docs/03 §4, docs/13 §6.
+ *
+ * Qué causas admiten excepción y quién puede concederla. No todas deberían:
+ * liberar sin contacto en una parada es un riesgo operativo que alguien puede
+ * asumir, y liberar con la licencia del operador vencida es otra cosa. Dejar la
+ * lista como configuración permite que cada empresa trace esa línea donde
+ * corresponda a su riesgo, y que quede registrada.
+ */
+export const releaseGatePolicySchema = z.object({
+  /** Causas que una excepción puede autorizar. Una fuera de esta lista jamás se libera. */
+  exceptionable_causes: z.array(z.string().min(1)),
+  exception_max_days: z.int().min(1).max(365),
+  exception_approver_permissions: z.array(permissionCode).min(1),
+  /** Si quien pide la excepción puede además concederla. Falso por docs/03 §14.3. */
+  allow_self_approval: z.boolean(),
+});
+
+export type ReleaseGatePolicy = z.infer<typeof releaseGatePolicySchema>;
+
 // ---------------------------------------------------------------------------
 // Registro de políticas
 // ---------------------------------------------------------------------------
@@ -123,6 +143,24 @@ export const POLICY_REGISTRY = {
       exception_max_days: 15,
       exception_approver_permissions: ["credit:override"],
     } satisfies CreditPolicy,
+  },
+  RELEASE_GATE: {
+    code: "RELEASE_GATE",
+    label: "Gate de liberación",
+    description:
+      "Qué causas del gate admiten excepción, quién puede concederla y por cuántos días.",
+    scopes: ["tenant", "legal_entity"] as PolicyScope[],
+    schema: releaseGatePolicySchema,
+    defaults: {
+      // Arranca permitiendo excepción solo en las causas que un responsable
+      // puede asumir con información. Las que faltan —credencial vencida y
+      // sobrepeso— no están por omisión: eximirlas es una decisión que cada
+      // empresa debe tomar explícitamente, no heredar de un valor de fábrica.
+      exceptionable_causes: ["stop_contact_missing", "driver_double_booked"],
+      exception_max_days: 7,
+      exception_approver_permissions: ["release:override"],
+      allow_self_approval: false,
+    } satisfies ReleaseGatePolicy,
   },
 } as const satisfies Record<string, PolicyDescriptor>;
 
