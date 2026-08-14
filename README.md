@@ -55,6 +55,13 @@ que autoriza.
 | Pantallas de flota y captura de carga, paradas y plan | Solo API |
 | Cargos, factura, pago y margen final | Fase 3 |
 
+Esta tabla dice qué existe. Lo que **falta**, por qué en ese orden y cómo se
+demuestra cada paso está en
+[docs/14 — Estado y plan de construcción](docs/14-estado-y-plan-de-construccion.md):
+contrasta las cifras del código contra la especificación —28 de 62 eventos del
+catálogo emitidos, 0 de 77 KPIs calculados, `fin` y `rsk` sin una sola tabla— y
+traza el camino en diez metas con puntos de control.
+
 ## Estructura
 
 ```text
@@ -268,6 +275,7 @@ aparece en la respuesta, en la auditoría y en cada evento emitido.
 | [13 — Fase 2: Orden a Entrega](docs/13-phase-2-order-to-delivery.md) | Contrato implementable del corte de ejecución, con el gate de liberación |
 | [10 — Mapa de capacidades](docs/10-capability-map.md) | Cobertura completa de todas las áreas del negocio |
 | [11 — Arquitectura técnica](docs/11-technical-reference-architecture.md) | Stack de referencia, escala, almacenamiento y despliegue |
+| [14 — Estado y plan de construcción](docs/14-estado-y-plan-de-construccion.md) | Lo construido contra lo especificado, y el camino en diez metas con puntos de control |
 
 ## Catálogos operables
 
